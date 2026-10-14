@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id            String    @id @default(uuid())
+  platform      String    // "shopify" | "woocommerce"
+  storeDomain   String
+  storeName     String?
+  accessToken   String?   // Shopify Admin API Access Token (shpat_...)
+  apiKey        String?   // WooCommerce Consumer Key (ck_...)
+  apiSecret     String?   // WooCommerce Consumer Secret (cs_...)
+  webhookSecret String?   // Webhook secret for HMAC verification
+  syncStatus    String    @default("idle") // "idle" | "in_progress" | "completed" | "failed"
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  customers     Customer[]
+  orders        Order[]
+  products      Product[]
+  webhookEvents WebhookEvent[]
+
+  @@unique([platform, storeDomain])
+  @@map("stores")
+}
+
+model Customer {
+  id                 String    @id @default(uuid())
+  storeId            String
+  store              Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  platformCustomerId String
+  email              String?
+  firstName          String?
+  lastName           String?
+  phone              String?
+  ordersCount        Int       @default(0)
+  totalSpent         Decimal   @default(0.00) @db.Decimal(12, 2)
+  currency           String    @default("USD")
+  addresses          Json?     @default("[]")
+  rawData            Json?     @default("{}")
+  platformCreatedAt  DateTime?
+  platformUpdatedAt  DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  orders             Order[]
+
+  @@unique([storeId, platformCustomerId])
+  @@index([storeId, email])
+  @@map("customers")
+}
+
+model Order {
+  id                String    @id @default(uuid())
+  storeId           String
+  store             Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  platformOrderId   String
+  orderNumber       String?
+  totalPrice        Decimal   @default(0.00) @db.Decimal(12, 2)
+  currency          String    @default("USD")
+  financialStatus   String?
+  fulfillmentStatus String?
+  lineItems         Json?     @default("[]")
+  rawData           Json?     @default("{}")
+  platformCreatedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([storeId, platformOrderId])
+  @@index([storeId, customerId])
+  @@map("orders")
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  storeId           String
+  store             Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  platformProductId String
+  title             String
+  handle            String?
+  price             Decimal  @default(0.00) @db.Decimal(12, 2)
+  status            String?
+  rawData           Json?    @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([storeId, platformProductId])
+  @@map("products")
+}
+
+model WebhookEvent {
+  id           String    @id @default(uuid())
+  storeId      String?
+  store        Store?    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  platform     String
+  topic        String
+  eventId      String?
+  status       String    @default("pending") // "pending" | "processed" | "failed"
+  errorMessage String?
+  payload      Json?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+
+  @@index([status])
+  @@map("webhook_events")
+}
