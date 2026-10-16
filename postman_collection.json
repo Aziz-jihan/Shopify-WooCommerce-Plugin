@@ -5,10 +5,35 @@
     "description": "Collection to test the entire e-commerce sync workflow locally using Postman without needing a real Shopify or WooCommerce store.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "dev-secret-key-1234",
       "type": "string"
     },
     {
@@ -20,6 +45,9 @@
   "item": [
     {
       "name": "01 - Health Check",
+      "auth": {
+        "type": "noauth"
+      },
       "item": [
         {
           "name": "Server Healthcheck",
@@ -66,7 +94,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"platform\": \"shopify\",\n  \"storeDomain\": \"demo-apparel.myshopify.com\",\n  \"accessToken\": \"shpat_mock_token_for_testing\",\n  \"isMock\": true\n}"
+              "raw": "{\n  \"platform\": \"shopify\",\n  \"storeDomain\": \"demo-apparel.myshopify.com\",\n  \"accessToken\": \"shpat_mock_token_for_testing\",\n  \"apiSecret\": \"shpss_mock_app_client_secret\",\n  \"isMock\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/stores/connect",
@@ -161,6 +189,9 @@
     },
     {
       "name": "04 - Realtime Webhook Simulation",
+      "auth": {
+        "type": "noauth"
+      },
       "item": [
         {
           "name": "Simulate Shopify Customer Webhook",
@@ -212,7 +243,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 883920192,\n  \"order_number\": \"#1099\",\n  \"customer_id\": 9928347101,\n  \"total_price\": \"499.00\",\n  \"currency\": \"USD\",\n  \"financial_status\": \"paid\",\n  \"fulfillment_status\": \"fulfilled\",\n  \"line_items\": [\n    {\n      \"title\": \"Arc Reactor Mark IV\",\n      \"quantity\": 1,\n      \"price\": \"499.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"id\": 883920192,\n  \"order_number\": \"#1099\",\n  \"customer_id\": 9928347101,\n  \"total_price\": \"499.00\",\n  \"currency\": \"USD\",\n  \"financial_status\": \"paid\",\n  \"fulfillment_status\": \"fulfilled\",\n  \"lineItems\": [\n    {\n      \"title\": \"Arc Reactor Mark IV\",\n      \"quantity\": 1,\n      \"price\": \"499.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{storeId}}",
@@ -264,7 +295,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 66291,\n  \"number\": \"66291\",\n  \"customer_id\": 77281,\n  \"total\": \"170.00\",\n  \"currency\": \"USD\",\n  \"status\": \"completed\",\n  \"line_items\": [\n    {\n      \"name\": \"Lasso of Truth Replicate\",\n      \"quantity\": 1,\n      \"price\": 170.0\n    }\n  ]\n}"
+              "raw": "{\n  \"id\": 66291,\n  \"number\": \"66291\",\n  \"customer_id\": 77281,\n  \"total\": \"170.00\",\n  \"currency\": \"USD\",\n  \"status\": \"completed\",\n  \"lineItems\": [\n    {\n      \"name\": \"Lasso of Truth Replicate\",\n      \"quantity\": 1,\n      \"price\": 170.0\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{storeId}}",

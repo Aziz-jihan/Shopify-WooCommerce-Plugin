@@ -32,7 +32,7 @@ export const ConnectStoreModal: React.FC<Props> = ({ isOpen, onClose, onSuccess 
         storeDomain,
         accessToken: platform === 'shopify' ? accessToken : undefined,
         apiKey: platform === 'woocommerce' ? apiKey : undefined,
-        apiSecret: platform === 'woocommerce' ? apiSecret : undefined,
+        apiSecret: apiSecret || undefined,
       });
 
       setSuccessInfo(res.message);
@@ -118,28 +118,54 @@ export const ConnectStoreModal: React.FC<Props> = ({ isOpen, onClose, onSuccess 
           </div>
 
           {platform === 'shopify' ? (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Admin API Access Token
-                </label>
-                <div className="group relative">
-                  <span className="flex items-center text-xs text-slate-400 cursor-pointer hover:text-slate-200">
-                    <HelpCircle className="w-3.5 h-3.5 mr-1" /> Where to find?
-                  </span>
-                  <div className="absolute right-0 bottom-full mb-2 hidden w-64 rounded-lg bg-slate-800 p-3 text-xs text-slate-300 shadow-xl border border-slate-700 group-hover:block z-10">
-                    In Shopify Admin: Settings &gt; Apps &gt; Develop apps &gt; Create app &gt; Configure scopes (<code className="text-emerald-400">read_customers, read_orders, read_products</code>) &gt; Install app &gt; Reveal token.
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Admin API Access Token
+                  </label>
+                  <div className="group relative">
+                    <span className="flex items-center text-xs text-slate-400 cursor-pointer hover:text-slate-200">
+                      <HelpCircle className="w-3.5 h-3.5 mr-1" /> Where to find?
+                    </span>
+                    <div className="absolute right-0 bottom-full mb-2 hidden w-64 rounded-lg bg-slate-800 p-3 text-xs text-slate-300 shadow-xl border border-slate-700 group-hover:block z-10">
+                      In Shopify Admin: Settings &gt; Apps &gt; Develop apps &gt; Create app &gt; Configure scopes (<code className="text-emerald-400">read_customers, read_orders, read_products</code>) &gt; Install app &gt; Reveal token.
+                    </div>
                   </div>
                 </div>
+                <input
+                  type="password"
+                  required
+                  placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  className="w-full rounded-lg bg-slate-800/80 border border-slate-700 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition text-sm font-mono"
+                />
               </div>
-              <input
-                type="password"
-                required
-                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                className="w-full rounded-lg bg-slate-800/80 border border-slate-700 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition text-sm font-mono"
-              />
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    App Client Secret (API Secret Key)
+                  </label>
+                  <div className="group relative">
+                    <span className="flex items-center text-xs text-slate-400 cursor-pointer hover:text-slate-200">
+                      <HelpCircle className="w-3.5 h-3.5 mr-1" /> Why needed?
+                    </span>
+                    <div className="absolute right-0 bottom-full mb-2 hidden w-64 rounded-lg bg-slate-800 p-3 text-xs text-slate-300 shadow-xl border border-slate-700 group-hover:block z-10">
+                      Shopify signs all webhook requests using your App&apos;s Client Secret. Found in Shopify Admin: Settings &gt; Apps &gt; Develop apps &gt; [Your App] &gt; API credentials &gt; API secret key.
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="password"
+                  required
+                  placeholder="shpss_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                  className="w-full rounded-lg bg-slate-800/80 border border-slate-700 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition text-sm font-mono"
+                />
+              </div>
             </div>
           ) : (
             <>

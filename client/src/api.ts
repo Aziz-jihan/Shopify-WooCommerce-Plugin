@@ -1,4 +1,12 @@
 const BASE_URL = '/api';
+const API_KEY = (import.meta as any).env?.VITE_API_KEY || 'dev-secret-key-1234';
+
+function getHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    'X-API-Key': API_KEY,
+    ...extra,
+  };
+}
 
 export interface Store {
   id: string;
@@ -75,10 +83,11 @@ export const api = {
     accessToken?: string;
     apiKey?: string;
     apiSecret?: string;
+    isMock?: boolean;
   }) {
     const res = await fetch(`${BASE_URL}/stores/connect`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -87,21 +96,28 @@ export const api = {
   },
 
   async listStores(): Promise<{ stores: Store[] }> {
-    const res = await fetch(`${BASE_URL}/stores`);
+    const res = await fetch(`${BASE_URL}/stores`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to list stores');
     return data;
   },
 
   async getStore(id: string): Promise<{ store: Store }> {
-    const res = await fetch(`${BASE_URL}/stores/${id}`);
+    const res = await fetch(`${BASE_URL}/stores/${id}`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch store');
     return data;
   },
 
   async triggerSync(id: string) {
-    const res = await fetch(`${BASE_URL}/stores/${id}/sync`, { method: 'POST' });
+    const res = await fetch(`${BASE_URL}/stores/${id}/sync`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to trigger sync');
     return data;
@@ -109,28 +125,36 @@ export const api = {
 
   async getStoreCustomers(id: string, page = 1, search = '') {
     const params = new URLSearchParams({ page: String(page), search });
-    const res = await fetch(`${BASE_URL}/stores/${id}/customers?${params}`);
+    const res = await fetch(`${BASE_URL}/stores/${id}/customers?${params}`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch customers');
     return data;
   },
 
   async getStoreOrders(id: string): Promise<{ orders: Order[] }> {
-    const res = await fetch(`${BASE_URL}/stores/${id}/orders`);
+    const res = await fetch(`${BASE_URL}/stores/${id}/orders`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch orders');
     return data;
   },
 
   async getStoreProducts(id: string): Promise<{ products: Product[] }> {
-    const res = await fetch(`${BASE_URL}/stores/${id}/products`);
+    const res = await fetch(`${BASE_URL}/stores/${id}/products`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch products');
     return data;
   },
 
   async getWebhookLogs(id: string): Promise<{ events: WebhookEvent[] }> {
-    const res = await fetch(`${BASE_URL}/stores/${id}/webhooks`);
+    const res = await fetch(`${BASE_URL}/stores/${id}/webhooks`, {
+      headers: getHeaders(),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch webhooks');
     return data;

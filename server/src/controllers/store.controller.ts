@@ -6,6 +6,24 @@ import { WooCommerceAdapter } from '../adapters/woocommerce.adapter.js';
 import { MockAdapter } from '../adapters/mock.adapter.js';
 import { SyncService } from '../services/sync.service.js';
 
+export const storePublicSelect = {
+  id: true,
+  platform: true,
+  storeDomain: true,
+  storeName: true,
+  syncStatus: true,
+  lastSyncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: {
+      customers: true,
+      orders: true,
+      products: true,
+    },
+  },
+} as const;
+
 export class StoreController {
   /**
    * Connect and validate a store (Shopify or WooCommerce)
@@ -37,6 +55,10 @@ export class StoreController {
       } else if (platform === 'shopify') {
         if (!accessToken) {
           res.status(400).json({ error: 'Shopify Admin API Access Token (accessToken) is required.' });
+          return;
+        }
+        if (!apiSecret) {
+          res.status(400).json({ error: 'Shopify App Client Secret (apiSecret) is required for webhook signature verification.' });
           return;
         }
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
@@ -88,6 +110,7 @@ export class StoreController {
           webhookSecret,
           syncStatus: 'idle',
         },
+        select: storePublicSelect,
       });
 
       // Attempt to register webhooks if APP_BASE_URL is configured (e.g. ngrok or production domain)
@@ -111,13 +134,7 @@ export class StoreController {
       res.status(200).json({
         success: true,
         message: `Successfully connected ${platform} store: ${storeName}`,
-        store: {
-          id: store.id,
-          platform: store.platform,
-          storeDomain: store.storeDomain,
-          storeName: store.storeName,
-          syncStatus: store.syncStatus,
-        },
+        store,
         webhooks: webhookResults,
       });
     } catch (err: any) {
@@ -127,21 +144,13 @@ export class StoreController {
   }
 
   /**
-   * List all connected stores with counts
+   * List all connected stores with counts (credentials omitted)
    */
   static async list(req: Request, res: Response): Promise<void> {
     try {
       const stores = await prisma.store.findMany({
         orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: {
-              customers: true,
-              orders: true,
-              products: true,
-            },
-          },
-        },
+        select: storePublicSelect,
       });
 
       res.json({ stores });
@@ -151,22 +160,14 @@ export class StoreController {
   }
 
   /**
-   * Get single store details
+   * Get single store details (credentials omitted)
    */
   static async get(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const store = await prisma.store.findUnique({
         where: { id },
-        include: {
-          _count: {
-            select: {
-              customers: true,
-              orders: true,
-              products: true,
-            },
-          },
-        },
+        select: storePublicSelect,
       });
 
       if (!store) {
