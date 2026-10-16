@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '../db.js';
 import { ShopifyAdapter } from '../adapters/shopify.adapter.js';
 import { WooCommerceAdapter } from '../adapters/woocommerce.adapter.js';
+import { MockAdapter } from '../adapters/mock.adapter.js';
 import { SyncService } from '../services/sync.service.js';
 
 export class StoreController {
@@ -11,7 +12,7 @@ export class StoreController {
    */
   static async connect(req: Request, res: Response): Promise<void> {
     try {
-      const { platform, storeDomain, accessToken, apiKey, apiSecret } = req.body;
+      const { platform, storeDomain, accessToken, apiKey, apiSecret, isMock } = req.body;
 
       if (!platform || !storeDomain) {
         res.status(400).json({ error: 'platform and storeDomain are required.' });
@@ -20,9 +21,20 @@ export class StoreController {
 
       let storeName = storeDomain;
       const webhookSecret = crypto.randomBytes(24).toString('hex');
+      const isMockMode = Boolean(
+        isMock ||
+        storeDomain.includes('demo') ||
+        storeDomain.includes('mock') ||
+        accessToken === 'mock' ||
+        apiKey === 'mock'
+      );
 
       // Test credentials with appropriate adapter
-      if (platform === 'shopify') {
+      if (isMockMode) {
+        const adapter = new MockAdapter(platform === 'woocommerce' ? 'woocommerce' : 'shopify', storeDomain);
+        const test = await adapter.testConnection();
+        storeName = test.storeName || `Demo ${platform} Store`;
+      } else if (platform === 'shopify') {
         if (!accessToken) {
           res.status(400).json({ error: 'Shopify Admin API Access Token (accessToken) is required.' });
           return;
@@ -63,16 +75,16 @@ export class StoreController {
           platform,
           storeDomain,
           storeName,
-          accessToken: accessToken || null,
-          apiKey: apiKey || null,
-          apiSecret: apiSecret || null,
+          accessToken: accessToken || (isMockMode ? 'mock' : null),
+          apiKey: apiKey || (isMockMode ? 'mock' : null),
+          apiSecret: apiSecret || (isMockMode ? 'mock' : null),
           webhookSecret,
         },
         update: {
           storeName,
-          accessToken: accessToken || null,
-          apiKey: apiKey || null,
-          apiSecret: apiSecret || null,
+          accessToken: accessToken || (isMockMode ? 'mock' : null),
+          apiKey: apiKey || (isMockMode ? 'mock' : null),
+          apiSecret: apiSecret || (isMockMode ? 'mock' : null),
           webhookSecret,
           syncStatus: 'idle',
         },
@@ -82,7 +94,10 @@ export class StoreController {
       const appBaseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
       let webhookResults: any[] = [];
       try {
-        if (platform === 'shopify') {
+        if (isMockMode) {
+          const adapter = new MockAdapter(platform === 'woocommerce' ? 'woocommerce' : 'shopify', storeDomain);
+          webhookResults = await adapter.registerWebhooks(appBaseUrl, store.id);
+        } else if (platform === 'shopify') {
           const adapter = new ShopifyAdapter(storeDomain, accessToken);
           webhookResults = await adapter.registerWebhooks(appBaseUrl, store.id);
         } else {

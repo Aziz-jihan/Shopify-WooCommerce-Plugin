@@ -96,11 +96,26 @@ export class WebhookService {
       }
 
       console.log(`[WebhookService] Fetching fresh Customer (${customerId}) from ${platform}...`);
-      const fullCustomer = await adapter.fetchCustomerById(customerId);
-      if (fullCustomer) {
-        await SyncService.upsertCustomer(store.id, fullCustomer);
-        console.log(`[WebhookService] Successfully updated Customer ${customerId} in database.`);
+      let fullCustomer = await adapter.fetchCustomerById(customerId);
+      if (!fullCustomer) {
+        console.log(`[WebhookService] Re-fetch returned null, falling back to direct payload for Customer ${customerId}`);
+        fullCustomer = {
+          platformCustomerId: customerId,
+          email: payload.email || null,
+          firstName: payload.first_name || payload.firstName || null,
+          lastName: payload.last_name || payload.lastName || null,
+          phone: payload.phone || payload.billing?.phone || null,
+          ordersCount: Number(payload.orders_count || payload.numberOfOrders || 0),
+          totalSpent: parseFloat(payload.total_spent || payload.amountSpent?.amount || '0'),
+          currency: payload.currency || 'USD',
+          addresses: payload.addresses || (payload.defaultAddress ? [payload.defaultAddress] : []),
+          rawData: payload,
+          platformCreatedAt: payload.created_at ? new Date(payload.created_at) : new Date(),
+          platformUpdatedAt: payload.updated_at ? new Date(payload.updated_at) : new Date(),
+        };
       }
+      await SyncService.upsertCustomer(store.id, fullCustomer);
+      console.log(`[WebhookService] Successfully updated Customer ${customerId} in database.`);
       return;
     }
 
@@ -112,17 +127,31 @@ export class WebhookService {
       }
 
       console.log(`[WebhookService] Fetching fresh Order (${orderId}) from ${platform}...`);
-      const fullOrder = await adapter.fetchOrderById(orderId);
-      if (fullOrder) {
-        await SyncService.upsertOrder(store.id, fullOrder);
-        console.log(`[WebhookService] Successfully updated Order ${orderId} in database.`);
+      let fullOrder = await adapter.fetchOrderById(orderId);
+      if (!fullOrder) {
+        console.log(`[WebhookService] Re-fetch returned null, falling back to direct payload for Order ${orderId}`);
+        const customerId = payload.customer?.id || payload.customer_id ? String(payload.customer?.id || payload.customer_id) : null;
+        fullOrder = {
+          platformOrderId: orderId,
+          platformCustomerId: customerId,
+          orderNumber: payload.order_number ? String(payload.order_number) : (payload.name || orderId),
+          totalPrice: parseFloat(payload.total_price || payload.total || '0'),
+          currency: payload.currency || 'USD',
+          financialStatus: payload.financial_status || payload.status || 'paid',
+          fulfillmentStatus: payload.fulfillment_status || 'unfulfilled',
+          lineItems: payload.line_items || [],
+          rawData: payload,
+          platformCreatedAt: payload.created_at ? new Date(payload.created_at) : new Date(),
+        };
+      }
+      await SyncService.upsertOrder(store.id, fullOrder);
+      console.log(`[WebhookService] Successfully updated Order ${orderId} in database.`);
 
-        // Also refresh the associated customer's totals if customer ID is present
-        if (fullOrder.platformCustomerId) {
-          const freshCustomer = await adapter.fetchCustomerById(fullOrder.platformCustomerId);
-          if (freshCustomer) {
-            await SyncService.upsertCustomer(store.id, freshCustomer);
-          }
+      // Also refresh the associated customer's totals if customer ID is present
+      if (fullOrder.platformCustomerId) {
+        const freshCustomer = await adapter.fetchCustomerById(fullOrder.platformCustomerId);
+        if (freshCustomer) {
+          await SyncService.upsertCustomer(store.id, freshCustomer);
         }
       }
       return;
@@ -136,11 +165,20 @@ export class WebhookService {
       }
 
       console.log(`[WebhookService] Fetching fresh Product (${productId}) from ${platform}...`);
-      const fullProduct = await adapter.fetchProductById(productId);
-      if (fullProduct) {
-        await SyncService.upsertProduct(store.id, fullProduct);
-        console.log(`[WebhookService] Successfully updated Product ${productId} in database.`);
+      let fullProduct = await adapter.fetchProductById(productId);
+      if (!fullProduct) {
+        console.log(`[WebhookService] Re-fetch returned null, falling back to direct payload for Product ${productId}`);
+        fullProduct = {
+          platformProductId: productId,
+          title: payload.title || payload.name || 'Untitled Product',
+          handle: payload.handle || payload.slug || null,
+          price: parseFloat(payload.price || payload.variants?.[0]?.price || '0'),
+          status: payload.status || 'active',
+          rawData: payload,
+        };
       }
+      await SyncService.upsertProduct(store.id, fullProduct);
+      console.log(`[WebhookService] Successfully updated Product ${productId} in database.`);
       return;
     }
 
