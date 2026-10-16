@@ -1,0 +1,386 @@
+{
+  "info": {
+    "_postman_id": "shopify-sync-bengali-tk-v1",
+    "name": "Shopify Data Sync Engine (বাংলা ও টাকা TK)",
+    "description": "Shopify-এর জন্য সম্পূর্ণ Postman কালেকশন: কানেক্ট করা, পূর্ববর্তী ডাটা ফেচ করা (পাঞ্জাবি, জামদানি শাড়ি ইত্যাদি), এবং রিয়েল-টাইম গ্রাহক, অর্ডার ও প্রোডাক্ট অ্যাড ও আপডেট ওয়েব হুক টেস্ট করা।",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "dev-secret-key-1234",
+      "type": "string"
+    },
+    {
+      "key": "shopifyStoreId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "০১ - সার্ভার হেলথ চেক (Health Check)",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "সার্ভার স্ট্যাটাস চেক",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০২ - শপিফাই স্টোর কানেকশন (Connect Store)",
+      "item": [
+        {
+          "name": "১. শপিফাই স্টোর কানেক্ট করুন (Connect Store)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.store && json.store.id) {",
+                  "    pm.collectionVariables.set('shopifyStoreId', json.store.id);",
+                  "    console.log('Shopify Store ID সংরক্ষিত হয়েছে:', json.store.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"shopify\",\n  \"storeDomain\": \"banglar-fashion.myshopify.com\",\n  \"accessToken\": \"shpat_mock_demo_token_12345\",\n  \"apiSecret\": \"shpss_mock_app_client_secret_67890\",\n  \"isMock\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/connect",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "connect"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. কানেক্টেড শপিফাই স্টোরের বিবরণ দেখুন",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৩ - পূর্ববর্তী ডাটা সিঙ্ক (Fetch Previous Data)",
+      "item": [
+        {
+          "name": "পূর্ববর্তী সকল গ্রাহক, অর্ডার ও পোশাক পণ্য ফেচ করুন (Trigger Initial Sync)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}", "sync"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৪ - শপিফাই ওয়েব হুক (Webhooks: Add & Update)",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "১. নতুন গ্রাহক যোগ (Customer Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "customers/create"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"মাহমুদুল\",\n  \"last_name\": \"হাসান\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 1,\n  \"amountSpent\": {\n    \"amount\": \"3500.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"বাড়ি নং ১৮, রোড ২, মিরপুর-১০\",\n    \"city\": \"ঢাকা\",\n    \"province\": \"ঢাকা বিভাগ\",\n    \"country\": \"বাংলাদেশ\",\n    \"zip\": \"১২১৬\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. গ্রাহকের তথ্য আপডেট (Customer Updated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "customers/update"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"মাহমুদুল\",\n  \"last_name\": \"হাসান (গোল্ড মেম্বার)\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 3,\n  \"amountSpent\": {\n    \"amount\": \"9800.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"বাড়ি নং ২৫, বনানী ডিওএইচএস\",\n    \"city\": \"ঢাকা\",\n    \"province\": \"ঢাকা বিভাগ\",\n    \"country\": \"বাংলাদেশ\",\n    \"zip\": \"১২১৩\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৩. নতুন পোশাক অর্ডার তৈরি (Order Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "orders/create"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#শপ-৫০১\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"পরিশোধিত\",\n  \"fulfillment_status\": \"প্রক্রিয়াধীন\",\n  \"line_items\": [\n    {\n      \"title\": \"খাদি সুতি পাঞ্জাবি\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"সিল্ক উত্তরীয় ও পায়জামা\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৪. অর্ডার আপডেট (Order Updated - ডেলিভারি সম্পন্ন)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "orders/updated"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#শপ-৫০১\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"পরিশোধিত\",\n  \"fulfillment_status\": \"ডেলিভারি সম্পন্ন\",\n  \"line_items\": [\n    {\n      \"title\": \"খাদি সুতি পাঞ্জাবি\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"সিল্ক উত্তরীয় ও পায়জামা\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৫. নতুন পোশাক পণ্য যোগ (Product Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "products/create"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"টাঙ্গাইল তাঁতের সুতি শাড়ি\",\n  \"handle\": \"tangail-taant-saree\",\n  \"price\": \"3800.00\",\n  \"status\": \"সক্রিয়\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৬. পোশাক পণ্য আপডেট (Product Updated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Shopify-Topic",
+                "value": "products/update"
+              },
+              {
+                "key": "X-Shopify-Shop-Domain",
+                "value": "banglar-fashion.myshopify.com"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"টাঙ্গাইল তাঁতের সুতি শাড়ি (উৎসব সংস্করণ)\",\n  \"handle\": \"tangail-taant-saree-festival\",\n  \"price\": \"4200.00\",\n  \"status\": \"সক্রিয়\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "shopify", "{{shopifyStoreId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৫ - ডাটাবেজের সংরক্ষিত ডাটা দেখুন (Query Stored Data)",
+      "item": [
+        {
+          "name": "১. সংরক্ষিত সকল গ্রাহক দেখুন (Get Customers)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}", "customers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. সংরক্ষিত অর্ডারসমূহ দেখুন (Get Orders)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৩. সংরক্ষিত পোশাক পণ্য তালিকা (Get Products)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৪. ওয়েব হুক ইভেন্ট লগ দেখুন (Get Webhook Logs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{shopifyStoreId}}/webhooks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{shopifyStoreId}}", "webhooks"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

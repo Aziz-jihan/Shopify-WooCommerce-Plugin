@@ -1,0 +1,362 @@
+{
+  "info": {
+    "_postman_id": "woocommerce-sync-bengali-tk-v1",
+    "name": "WooCommerce Data Sync Engine (বাংলা ও টাকা TK)",
+    "description": "WooCommerce-এর জন্য সম্পূর্ণ Postman কালেকশন: কানেক্ট করা, পূর্ববর্তী ডাটা ফেচ করা (পাঞ্জাবি, জামদানি শাড়ি ইত্যাদি), এবং রিয়েল-টাইম গ্রাহক, অর্ডার ও প্রোডাক্ট অ্যাড ও আপডেট ওয়েব হুক টেস্ট করা।",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "dev-secret-key-1234",
+      "type": "string"
+    },
+    {
+      "key": "wooStoreId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "০১ - সার্ভার হেলথ চেক (Health Check)",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "সার্ভার স্ট্যাটাস চেক",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০২ - উকমার্স স্টোর কানেকশন (Connect Store)",
+      "item": [
+        {
+          "name": "১. উকমার্স স্টোর কানেক্ট করুন (Connect Store)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.store && json.store.id) {",
+                  "    pm.collectionVariables.set('wooStoreId', json.store.id);",
+                  "    console.log('WooCommerce Store ID সংরক্ষিত হয়েছে:', json.store.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"woocommerce\",\n  \"storeDomain\": \"https://oitijjo-clothing.local\",\n  \"apiKey\": \"ck_mock_demo_consumer_key_111\",\n  \"apiSecret\": \"cs_mock_demo_consumer_secret_222\",\n  \"isMock\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/connect",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "connect"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. কানেক্টেড উকমার্স স্টোরের বিবরণ দেখুন",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৩ - পূর্ববর্তী ডাটা সিঙ্ক (Fetch Previous Data)",
+      "item": [
+        {
+          "name": "পূর্ববর্তী সকল গ্রাহক, অর্ডার ও পোশাক পণ্য ফেচ করুন (Trigger Initial Sync)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}", "sync"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৪ - উকমার্স ওয়েব হুক (Webhooks: Add & Update)",
+      "auth": {
+        "type": "noauth"
+      },
+      "item": [
+        {
+          "name": "১. নতুন গ্রাহক যোগ (Customer Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "customer.created"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 661122,\n  \"first_name\": \"নাজমুল\",\n  \"last_name\": \"হক\",\n  \"email\": \"nazmul.haque@example.com\",\n  \"billing\": {\n    \"phone\": \"+8801822334455\"\n  },\n  \"orders_count\": 1,\n  \"total_spent\": \"2800.00\",\n  \"currency\": \"TK\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. গ্রাহকের তথ্য আপডেট (Customer Updated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "customer.updated"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 661122,\n  \"first_name\": \"নাজমুল\",\n  \"last_name\": \"হক (প্লাটিনাম মেম্বার)\",\n  \"email\": \"nazmul.haque@example.com\",\n  \"billing\": {\n    \"phone\": \"+8801822334455\"\n  },\n  \"orders_count\": 4,\n  \"total_spent\": \"11200.00\",\n  \"currency\": \"TK\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৩. নতুন পোশাক অর্ডার তৈরি (Order Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "order.created"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 552233,\n  \"number\": \"উক-৭৮৬\",\n  \"customer_id\": 661122,\n  \"total\": \"6500.00\",\n  \"currency\": \"TK\",\n  \"status\": \"পরিশোধিত\",\n  \"line_items\": [\n    {\n      \"name\": \"কাতান পাঞ্জাবি ও কোট সেট\",\n      \"quantity\": 1,\n      \"price\": \"4500.00\"\n    },\n    {\n      \"name\": \"সুতি পায়জামা\",\n      \"quantity\": 2,\n      \"price\": \"1000.00\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৪. অর্ডার আপডেট (Order Updated - কমপ্লিট)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "order.updated"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 552233,\n  \"number\": \"উক-৭৮৬\",\n  \"customer_id\": 661122,\n  \"total\": \"6500.00\",\n  \"currency\": \"TK\",\n  \"status\": \"ডেলিভারি সম্পন্ন\",\n  \"line_items\": [\n    {\n      \"name\": \"কাতান পাঞ্জাবি ও কোট সেট\",\n      \"quantity\": 1,\n      \"price\": \"4500.00\"\n    },\n    {\n      \"name\": \"সুতি পায়জামা\",\n      \"quantity\": 2,\n      \"price\": \"1000.00\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৫. নতুন পোশাক পণ্য যোগ (Product Created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "product.created"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 443322,\n  \"name\": \"রাজশাহী সিল্ক শাড়ি\",\n  \"slug\": \"rajshahi-silk-saree\",\n  \"price\": \"8500.00\",\n  \"status\": \"সক্রিয়\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৬. পোশাক পণ্য আপডেট (Product Updated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-WC-Webhook-Topic",
+                "value": "product.updated"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 443322,\n  \"name\": \"রাজশাহী সিল্ক শাড়ি (স্পেশাল এমব্রয়ডারি)\",\n  \"slug\": \"rajshahi-silk-saree-embroidery\",\n  \"price\": \"9200.00\",\n  \"status\": \"সক্রিয়\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/woocommerce/{{wooStoreId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "woocommerce", "{{wooStoreId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "০৫ - ডাটাবেজের সংরক্ষিত ডাটা দেখুন (Query Stored Data)",
+      "item": [
+        {
+          "name": "১. সংরক্ষিত সকল গ্রাহক দেখুন (Get Customers)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}", "customers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "২. সংরক্ষিত অর্ডারসমূহ দেখুন (Get Orders)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৩. সংরক্ষিত পোশাক পণ্য তালিকা (Get Products)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "৪. ওয়েব হুক ইভেন্ট লগ দেখুন (Get Webhook Logs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stores/{{wooStoreId}}/webhooks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stores", "{{wooStoreId}}", "webhooks"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
