@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "shopify-sync-bengali-tk-v1",
-    "name": "Shopify Data Sync Engine (বাংলা ও টাকা TK)",
-    "description": "Shopify-এর জন্য সম্পূর্ণ Postman কালেকশন: কানেক্ট করা, পূর্ববর্তী ডাটা ফেচ করা (পাঞ্জাবি, জামদানি শাড়ি ইত্যাদি), এবং রিয়েল-টাইম গ্রাহক, অর্ডার ও প্রোডাক্ট অ্যাড ও আপডেট ওয়েব হুক টেস্ট করা।",
+    "_postman_id": "shopify-sync-bengali-names-en-tk",
+    "name": "Shopify Data Sync Engine (English - Bengali Names - TK)",
+    "description": "Complete Postman collection for Shopify: Connect store, fetch previous historical clothing data, and simulate real-time customer, order, and product webhooks (Create & Update). All customer names are Bengali, language is English, and currency is TK.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -44,13 +44,13 @@
   ],
   "item": [
     {
-      "name": "০১ - সার্ভার হেলথ চেক (Health Check)",
+      "name": "01 - Health Check",
       "auth": {
         "type": "noauth"
       },
       "item": [
         {
-          "name": "সার্ভার স্ট্যাটাস চেক",
+          "name": "Server Healthcheck",
           "request": {
             "method": "GET",
             "header": [],
@@ -65,10 +65,10 @@
       ]
     },
     {
-      "name": "০২ - শপিফাই স্টোর কানেকশন (Connect Store)",
+      "name": "02 - Store Connection",
       "item": [
         {
-          "name": "১. শপিফাই স্টোর কানেক্ট করুন (Connect Store)",
+          "name": "1. Connect Shopify Store",
           "event": [
             {
               "listen": "test",
@@ -77,7 +77,7 @@
                   "const json = pm.response.json();",
                   "if (json.store && json.store.id) {",
                   "    pm.collectionVariables.set('shopifyStoreId', json.store.id);",
-                  "    console.log('Shopify Store ID সংরক্ষিত হয়েছে:', json.store.id);",
+                  "    console.log('Saved shopifyStoreId:', json.store.id);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -105,7 +105,7 @@
           "response": []
         },
         {
-          "name": "২. কানেক্টেড শপিফাই স্টোরের বিবরণ দেখুন",
+          "name": "2. Get Connected Store Details",
           "request": {
             "method": "GET",
             "header": [],
@@ -120,10 +120,10 @@
       ]
     },
     {
-      "name": "০৩ - পূর্ববর্তী ডাটা সিঙ্ক (Fetch Previous Data)",
+      "name": "03 - Fetch Previous Data (Initial Sync)",
       "item": [
         {
-          "name": "পূর্ববর্তী সকল গ্রাহক, অর্ডার ও পোশাক পণ্য ফেচ করুন (Trigger Initial Sync)",
+          "name": "Fetch Previous Customers, Orders & Products",
           "request": {
             "method": "POST",
             "header": [],
@@ -138,13 +138,13 @@
       ]
     },
     {
-      "name": "০৪ - শপিফাই ওয়েব হুক (Webhooks: Add & Update)",
+      "name": "04 - Shopify Webhooks (Add & Update)",
       "auth": {
         "type": "noauth"
       },
       "item": [
         {
-          "name": "১. নতুন গ্রাহক যোগ (Customer Created)",
+          "name": "1. Customer Created Webhook",
           "request": {
             "method": "POST",
             "header": [
@@ -163,7 +163,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"মাহমুদুল\",\n  \"last_name\": \"হাসান\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 1,\n  \"amountSpent\": {\n    \"amount\": \"3500.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"বাড়ি নং ১৮, রোড ২, মিরপুর-১০\",\n    \"city\": \"ঢাকা\",\n    \"province\": \"ঢাকা বিভাগ\",\n    \"country\": \"বাংলাদেশ\",\n    \"zip\": \"১২১৬\"\n  }\n}"
+              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"Mahmudul\",\n  \"last_name\": \"Hasan\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 1,\n  \"amountSpent\": {\n    \"amount\": \"3500.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"House 18, Road 2, Mirpur-10\",\n    \"city\": \"Dhaka\",\n    \"province\": \"Dhaka Division\",\n    \"country\": \"Bangladesh\",\n    \"zip\": \"1216\"\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -174,7 +174,7 @@
           "response": []
         },
         {
-          "name": "২. গ্রাহকের তথ্য আপডেট (Customer Updated)",
+          "name": "2. Customer Updated Webhook",
           "request": {
             "method": "POST",
             "header": [
@@ -193,7 +193,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"মাহমুদুল\",\n  \"last_name\": \"হাসান (গোল্ড মেম্বার)\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 3,\n  \"amountSpent\": {\n    \"amount\": \"9800.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"বাড়ি নং ২৫, বনানী ডিওএইচএস\",\n    \"city\": \"ঢাকা\",\n    \"province\": \"ঢাকা বিভাগ\",\n    \"country\": \"বাংলাদেশ\",\n    \"zip\": \"১২১৩\"\n  }\n}"
+              "raw": "{\n  \"id\": 99112233,\n  \"first_name\": \"Mahmudul\",\n  \"last_name\": \"Hasan (Gold Member)\",\n  \"email\": \"mahmudul.hasan@example.com\",\n  \"phone\": \"+8801755443322\",\n  \"numberOfOrders\": 3,\n  \"amountSpent\": {\n    \"amount\": \"9800.00\",\n    \"currencyCode\": \"TK\"\n  },\n  \"defaultAddress\": {\n    \"address1\": \"House 25, Banani DOHS\",\n    \"city\": \"Dhaka\",\n    \"province\": \"Dhaka Division\",\n    \"country\": \"Bangladesh\",\n    \"zip\": \"1213\"\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -204,7 +204,7 @@
           "response": []
         },
         {
-          "name": "৩. নতুন পোশাক অর্ডার তৈরি (Order Created)",
+          "name": "3. Order Created Webhook",
           "request": {
             "method": "POST",
             "header": [
@@ -223,7 +223,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#শপ-৫০১\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"পরিশোধিত\",\n  \"fulfillment_status\": \"প্রক্রিয়াধীন\",\n  \"line_items\": [\n    {\n      \"title\": \"খাদি সুতি পাঞ্জাবি\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"সিল্ক উত্তরীয় ও পায়জামা\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#SHP-501\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"paid\",\n  \"fulfillment_status\": \"unfulfilled\",\n  \"line_items\": [\n    {\n      \"title\": \"Khadi Cotton Panjabi\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"Silk Uttoriyo & Pajama Set\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -234,7 +234,7 @@
           "response": []
         },
         {
-          "name": "৪. অর্ডার আপডেট (Order Updated - ডেলিভারি সম্পন্ন)",
+          "name": "4. Order Updated Webhook (Marked Fulfilled)",
           "request": {
             "method": "POST",
             "header": [
@@ -253,7 +253,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#শপ-৫০১\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"পরিশোধিত\",\n  \"fulfillment_status\": \"ডেলিভারি সম্পন্ন\",\n  \"line_items\": [\n    {\n      \"title\": \"খাদি সুতি পাঞ্জাবি\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"সিল্ক উত্তরীয় ও পায়জামা\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
+              "raw": "{\n  \"id\": 88223344,\n  \"order_number\": \"#SHP-501\",\n  \"customer_id\": 99112233,\n  \"total_price\": \"5400.00\",\n  \"currency\": \"TK\",\n  \"financial_status\": \"paid\",\n  \"fulfillment_status\": \"fulfilled\",\n  \"line_items\": [\n    {\n      \"title\": \"Khadi Cotton Panjabi\",\n      \"quantity\": 1,\n      \"price\": \"2900.00\"\n    },\n    {\n      \"title\": \"Silk Uttoriyo & Pajama Set\",\n      \"quantity\": 1,\n      \"price\": \"2500.00\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -264,7 +264,7 @@
           "response": []
         },
         {
-          "name": "৫. নতুন পোশাক পণ্য যোগ (Product Created)",
+          "name": "5. Product Created Webhook",
           "request": {
             "method": "POST",
             "header": [
@@ -283,7 +283,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"টাঙ্গাইল তাঁতের সুতি শাড়ি\",\n  \"handle\": \"tangail-taant-saree\",\n  \"price\": \"3800.00\",\n  \"status\": \"সক্রিয়\"\n}"
+              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"Tangail Taant Handloom Cotton Saree\",\n  \"handle\": \"tangail-taant-handloom-saree\",\n  \"price\": \"3800.00\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -294,7 +294,7 @@
           "response": []
         },
         {
-          "name": "৬. পোশাক পণ্য আপডেট (Product Updated)",
+          "name": "6. Product Updated Webhook",
           "request": {
             "method": "POST",
             "header": [
@@ -313,7 +313,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"টাঙ্গাইল তাঁতের সুতি শাড়ি (উৎসব সংস্করণ)\",\n  \"handle\": \"tangail-taant-saree-festival\",\n  \"price\": \"4200.00\",\n  \"status\": \"সক্রিয়\"\n}"
+              "raw": "{\n  \"id\": 77334455,\n  \"title\": \"Tangail Taant Handloom Cotton Saree (Festival Edition)\",\n  \"handle\": \"tangail-taant-saree-festival-edition\",\n  \"price\": \"4200.00\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/shopify/{{shopifyStoreId}}",
@@ -326,10 +326,10 @@
       ]
     },
     {
-      "name": "০৫ - ডাটাবেজের সংরক্ষিত ডাটা দেখুন (Query Stored Data)",
+      "name": "05 - Query Stored Data",
       "item": [
         {
-          "name": "১. সংরক্ষিত সকল গ্রাহক দেখুন (Get Customers)",
+          "name": "1. Get Stored Customers",
           "request": {
             "method": "GET",
             "header": [],
@@ -342,7 +342,7 @@
           "response": []
         },
         {
-          "name": "২. সংরক্ষিত অর্ডারসমূহ দেখুন (Get Orders)",
+          "name": "2. Get Stored Orders",
           "request": {
             "method": "GET",
             "header": [],
@@ -355,7 +355,7 @@
           "response": []
         },
         {
-          "name": "৩. সংরক্ষিত পোশাক পণ্য তালিকা (Get Products)",
+          "name": "3. Get Stored Products",
           "request": {
             "method": "GET",
             "header": [],
@@ -368,7 +368,7 @@
           "response": []
         },
         {
-          "name": "৪. ওয়েব হুক ইভেন্ট লগ দেখুন (Get Webhook Logs)",
+          "name": "4. Get Webhook Audit Logs",
           "request": {
             "method": "GET",
             "header": [],
