@@ -356,10 +356,24 @@ export class ShopifyAdapter implements ECommerceAdapter {
               title
               handle
               status
+              descriptionHtml
               priceRangeV2 {
                 minVariantPrice {
                   amount
                   currencyCode
+                }
+              }
+              variants(first: 100) {
+                edges {
+                  node {
+                    id
+                    legacyResourceId
+                    title
+                    sku
+                    price
+                    compareAtPrice
+                    inventoryQuantity
+                  }
                 }
               }
             }
@@ -401,9 +415,23 @@ export class ShopifyAdapter implements ECommerceAdapter {
           title
           handle
           status
+          descriptionHtml
           priceRangeV2 {
             minVariantPrice {
               amount
+            }
+          }
+          variants(first: 100) {
+            edges {
+              node {
+                id
+                legacyResourceId
+                title
+                sku
+                price
+                compareAtPrice
+                inventoryQuantity
+              }
             }
           }
         }

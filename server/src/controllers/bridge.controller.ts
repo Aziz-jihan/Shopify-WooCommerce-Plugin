@@ -225,28 +225,70 @@ export class BridgeController {
 
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
         const fetched = await adapter.fetchProducts(undefined, limit || 20);
-        productsToSync = fetched.items.map((i) => ({
-          id: i.platformProductId,
-          title: i.title,
-          price: i.price,
-          status: i.status,
-          body_html: '',
-        }));
+        productsToSync = fetched.items.map((i) => {
+          const raw = i.rawData || {};
+          return {
+            id: i.platformProductId,
+            title: i.title,
+            price: i.price,
+            status: i.status,
+            descriptionHtml: raw.descriptionHtml || '',
+            variants: raw.variants || [],
+          };
+        });
       }
 
       console.log(`[Bridge] Fetched ${productsToSync.length} products. Streaming directly to AutoMate...`);
 
       const results = [];
       for (const p of productsToSync) {
+        let variations: any[] = [];
+        if (platform === 'woocommerce' && (p.type === 'variable' || (Array.isArray(p.variations) && p.variations.length > 0))) {
+          if (Array.isArray(p.variations) && typeof p.variations[0] === 'object') {
+            variations = p.variations;
+          } else {
+            try {
+              let cleanUrl = storeUrl.trim().replace(/\/$/, '');
+              if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+                cleanUrl = `https://${cleanUrl}`;
+              }
+              const authHeader = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+              const httpsAgent = new https.Agent({ rejectUnauthorized: !ignoreCert, keepAlive: true });
+              const varRes = await axios.get(`${cleanUrl}/wp-json/wc/v3/products/${p.id}/variations`, {
+                headers: { Authorization: `Basic ${authHeader}` },
+                params: { per_page: 100 },
+                timeout: 30000,
+                httpsAgent,
+              });
+              variations = varRes.data || [];
+              console.log(`[Bridge] Fetched ${variations.length} variations for WC product #${p.id} (${p.name})`);
+            } catch (varErr: any) {
+              console.warn(`[Bridge] Warning: Could not fetch variations for WC product #${p.id}:`, varErr.message);
+            }
+          }
+        }
+
         const payload = platform === 'shopify' 
           ? AutoMateTransformer.transformShopifyProduct(p) 
-          : AutoMateTransformer.transformWooCommerceProduct(p);
+          : AutoMateTransformer.transformWooCommerceProduct(p, variations);
 
         try {
           const amRes = await automate.syncProduct(payload);
-          results.push({ id: payload.product_id, name: payload.name, success: true, autoMate: amRes });
+          results.push({
+            id: payload.product_id,
+            name: payload.name,
+            variantsCount: payload.variants ? payload.variants.length : 0,
+            success: true,
+            autoMate: amRes,
+          });
         } catch (itemErr: any) {
-          results.push({ id: payload.product_id, name: payload.name, success: false, error: itemErr.message });
+          results.push({
+            id: payload.product_id,
+            name: payload.name,
+            variantsCount: payload.variants ? payload.variants.length : 0,
+            success: false,
+            error: itemErr.message,
+          });
         }
 
         // 500ms pacing as requested by AutoMate rate-limit spec (max 2 requests/sec)

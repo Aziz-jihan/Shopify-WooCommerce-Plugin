@@ -120,7 +120,11 @@ export default function App() {
       if (res.items) {
         res.items.forEach((item: any) => {
           if (item.success) {
-            addLog('info', `-> Product synced: "${item.name}" (ID: ${item.id})`);
+            const varCount = typeof item.variantsCount === 'number'
+              ? item.variantsCount
+              : (item.autoMate?.variants ?? 0);
+            const varInfo = varCount > 0 ? ` (${varCount} variant${varCount > 1 ? 's' : ''})` : '';
+            addLog('info', `-> Product synced: "${item.name}" (ID: ${item.id})${varInfo}`);
           } else {
             addLog('warning', `-> Product failed: "${item.name}" - ${item.error}`);
           }

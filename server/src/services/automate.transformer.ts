@@ -139,27 +139,52 @@ export class AutoMateTransformer {
       status: wcProduct.status === 'publish' ? 'publish' : 'draft',
     };
 
-    if (variations && variations.length > 0) {
-      productPayload.variants = variations.map((v: any) => {
-        const vPrice = parseFloat(v.regular_price || v.price || wcProduct.regular_price || wcProduct.price || '0');
+    // Determine variations source: passed array, or embedded variation objects in wcProduct
+    const effectiveVariations: any[] = (Array.isArray(variations) && variations.length > 0)
+      ? variations
+      : (Array.isArray(wcProduct.variations) && typeof wcProduct.variations[0] === 'object'
+          ? wcProduct.variations
+          : (Array.isArray(wcProduct.variation_products) ? wcProduct.variation_products : []));
+
+    if (effectiveVariations && effectiveVariations.length > 0) {
+      productPayload.variants = effectiveVariations.map((v: any) => {
+        const vRegularPrice = parseFloat(v.regular_price || v.price || wcProduct.regular_price || wcProduct.price || '0');
         const vSalePrice = parseFloat(v.sale_price || '0');
 
-        let variantName = v.name;
-        if (!variantName && v.attributes && Array.isArray(v.attributes)) {
-          const attrStr = v.attributes.map((a: any) => a.option).filter(Boolean).join(', ');
-          variantName = `${wcProduct.name} - ${attrStr}`;
+        let attrStr = '';
+        if (Array.isArray(v.attributes) && v.attributes.length > 0) {
+          attrStr = v.attributes.map((a: any) => a.option || a.name).filter(Boolean).join(', ');
         }
+
+        let variantName = v.name;
+        if (!variantName || !variantName.includes(wcProduct.name)) {
+          variantName = attrStr ? `${wcProduct.name} - ${attrStr}` : (variantName ? `${wcProduct.name} - ${variantName}` : `${wcProduct.name} - #${v.id}`);
+        }
+
+        const variantStock = v.stock_quantity !== null && v.stock_quantity !== undefined
+          ? parseInt(String(v.stock_quantity), 10)
+          : (v.manage_stock ? 0 : (v.stock_status === 'instock' ? 100 : 0));
 
         const variantObj: AutoMateVariant = {
           variant_id: String(v.id),
-          name: (variantName || wcProduct.name).substring(0, 600),
+          name: variantName.substring(0, 600),
           sku: v.sku ? String(v.sku).substring(0, 255) : undefined,
-          price: isNaN(vPrice) ? 0 : vPrice,
+          price: isNaN(vRegularPrice) || vRegularPrice <= 0 ? (productPayload.price || 0) : vRegularPrice,
           sale_price: isNaN(vSalePrice) || vSalePrice <= 0 ? undefined : vSalePrice,
-          stock: v.stock_quantity !== null && v.stock_quantity !== undefined ? parseInt(String(v.stock_quantity), 10) : 0,
+          stock: variantStock,
         };
         return variantObj;
       });
+
+      // If parent price was 0 or not given (common for variable products), use the lowest variant price
+      if (productPayload.price === 0 && productPayload.variants.length > 0) {
+        const prices = productPayload.variants
+          .map((v) => v.price)
+          .filter((p): p is number => typeof p === 'number' && p > 0);
+        if (prices.length > 0) {
+          productPayload.price = Math.min(...prices);
+        }
+      }
     }
 
     return productPayload;
@@ -230,25 +255,30 @@ export class AutoMateTransformer {
    * Maps a Shopify Product (from GraphQL/webhook) to AutoMate's sync-products payload
    */
   static transformShopifyProduct(shopifyProduct: any): AutoMateSyncProductPayload {
-    const rawVariants = shopifyProduct.variants || shopifyProduct.variants?.edges?.map((e: any) => e.node) || [];
-    const firstVariant = rawVariants[0] || {};
-    const basePrice = parseFloat(String(firstVariant.price || '0'));
+    const rawVariants: any[] = Array.isArray(shopifyProduct.variants)
+      ? shopifyProduct.variants
+      : (Array.isArray(shopifyProduct.variants?.edges)
+          ? shopifyProduct.variants.edges.map((e: any) => e.node)
+          : []);
 
-    const productId = String(shopifyProduct.id).replace('gid://shopify/Product/', '');
+    const firstVariant = rawVariants[0] || {};
+    const basePrice = parseFloat(String(firstVariant.price || shopifyProduct.price || '0'));
+
+    const productId = String(shopifyProduct.legacyResourceId || shopifyProduct.id).replace('gid://shopify/Product/', '');
 
     const payload: AutoMateSyncProductPayload = {
       product_id: productId,
       name: (shopifyProduct.title || 'Shopify Product').substring(0, 500),
-      description: this.stripHtml(shopifyProduct.body_html || shopifyProduct.description || '').substring(0, 50000),
+      description: this.stripHtml(shopifyProduct.descriptionHtml || shopifyProduct.body_html || shopifyProduct.description || '').substring(0, 50000),
       price: isNaN(basePrice) ? 0 : basePrice,
       status: shopifyProduct.status === 'ACTIVE' || shopifyProduct.status === 'active' ? 'publish' : 'draft',
     };
 
     if (rawVariants.length > 0) {
       payload.variants = rawVariants.map((v: any) => {
-        const vId = String(v.id).replace('gid://shopify/ProductVariant/', '');
+        const vId = String(v.legacyResourceId || v.id).replace('gid://shopify/ProductVariant/', '');
         const vPrice = parseFloat(String(v.price || basePrice));
-        const vCompareAt = parseFloat(String(v.compare_at_price || '0'));
+        const vCompareAt = parseFloat(String(v.compare_at_price || v.compareAtPrice || '0'));
 
         let regularPrice = vPrice;
         let salePrice: number | undefined = undefined;
@@ -258,13 +288,17 @@ export class AutoMateTransformer {
           salePrice = vPrice;
         }
 
+        const stockQuantity = v.inventory_quantity !== null && v.inventory_quantity !== undefined
+          ? parseInt(String(v.inventory_quantity), 10)
+          : (v.inventoryQuantity !== null && v.inventoryQuantity !== undefined ? parseInt(String(v.inventoryQuantity), 10) : 0);
+
         const variantObj: AutoMateVariant = {
           variant_id: vId,
           name: (v.title && v.title !== 'Default Title' ? `${shopifyProduct.title} - ${v.title}` : shopifyProduct.title).substring(0, 600),
           sku: v.sku ? String(v.sku).substring(0, 255) : undefined,
           price: regularPrice,
           sale_price: salePrice,
-          stock: v.inventory_quantity !== null && v.inventory_quantity !== undefined ? parseInt(String(v.inventory_quantity), 10) : 0,
+          stock: stockQuantity,
         };
         return variantObj;
       });
