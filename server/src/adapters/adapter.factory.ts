@@ -1,9 +1,17 @@
-import { Store } from '@prisma/client';
 import { ECommerceAdapter } from './types.js';
 import { ShopifyAdapter } from './shopify.adapter.js';
 import { WooCommerceAdapter } from './woocommerce.adapter.js';
 
-export function createAdapterForStore(store: Store): ECommerceAdapter {
+export interface StoreCredentials {
+  platform: 'shopify' | 'woocommerce';
+  storeDomain: string;
+  accessToken?: string | null;
+  apiKey?: string | null;
+  apiSecret?: string | null;
+  webhookSecret?: string | null;
+}
+
+export function createAdapterForStore(store: StoreCredentials): ECommerceAdapter {
   if (store.platform === 'shopify') {
     if (!store.accessToken) {
       throw new Error(`Shopify store ${store.storeDomain} has no access token configured.`);
