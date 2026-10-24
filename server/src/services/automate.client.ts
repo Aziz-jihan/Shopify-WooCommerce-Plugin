@@ -95,14 +95,6 @@ export class AutoMateClient {
   }
 
   async testConnection(): Promise<{ success: boolean; shop?: string; store?: string; error?: string }> {
-    if (this.token.startsWith('mock_') || this.baseUrl.includes('mock')) {
-      return {
-        success: true,
-        shop: 'Banglar Heritage Fashion Ltd.',
-        store: 'Online Clothing Flagship Store',
-      };
-    }
-
     try {
       const response = await this.client.get<AutoMateTestConnectionResponse>('/test-connection');
       if (response.data && response.data.ok) {
@@ -121,16 +113,6 @@ export class AutoMateClient {
   }
 
   async createWebOrder(payload: AutoMateCreateWebOrderPayload): Promise<AutoMateCreateWebOrderResponse> {
-    if (this.token.startsWith('mock_') || this.baseUrl.includes('mock')) {
-      return {
-        ok: true,
-        orderId: `am_ord_${Date.now()}`,
-        invoiceId: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-        duplicate: false,
-        unmatched: [],
-      };
-    }
-
     try {
       const response = await this.client.post<AutoMateCreateWebOrderResponse>('/create-web-order', payload);
       return response.data;
@@ -147,16 +129,6 @@ export class AutoMateClient {
   }
 
   async syncProduct(payload: AutoMateSyncProductPayload): Promise<AutoMateSyncProductResponse> {
-    if (this.token.startsWith('mock_') || this.baseUrl.includes('mock')) {
-      return {
-        ok: true,
-        productId: `am_prod_${payload.product_id}`,
-        variants: payload.variants?.length || 1,
-        created: 1,
-        updated: 0,
-      };
-    }
-
     try {
       const response = await this.client.post<AutoMateSyncProductResponse>('/sync-products', payload);
       return response.data;

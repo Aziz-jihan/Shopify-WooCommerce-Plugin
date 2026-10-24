@@ -20,7 +20,6 @@ export interface StoreConfig {
   consumerKey?: string;
   consumerSecret?: string;
   accessToken?: string;
-  isMock?: boolean;
 }
 
 export interface Store {
@@ -128,7 +127,6 @@ export const api = {
         consumerKey: store.consumerKey,
         consumerSecret: store.consumerSecret,
         accessToken: store.accessToken,
-        isMock: store.isMock,
       }),
     });
     const data = await res.json();
@@ -151,7 +149,6 @@ export const api = {
         consumerKey: store.consumerKey,
         consumerSecret: store.consumerSecret,
         accessToken: store.accessToken,
-        isMock: store.isMock,
         automateBaseUrl: automate.baseUrl,
         automateToken: automate.token,
       }),
@@ -176,7 +173,6 @@ export const api = {
         consumerKey: store.consumerKey,
         consumerSecret: store.consumerSecret,
         accessToken: store.accessToken,
-        isMock: store.isMock,
         automateBaseUrl: automate.baseUrl,
         automateToken: automate.token,
       }),

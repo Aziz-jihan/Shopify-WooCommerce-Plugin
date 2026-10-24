@@ -27,15 +27,15 @@ interface LogEntry {
 export default function App() {
   // Store Config
   const [platform, setPlatform] = useState<'woocommerce' | 'shopify'>('woocommerce');
-  const [storeUrl, setStoreUrl] = useState('https://oitijjo-clothing.local');
-  const [consumerKey, setConsumerKey] = useState('ck_mock_demo_consumer_key_111');
-  const [consumerSecret, setConsumerSecret] = useState('cs_mock_demo_consumer_secret_222');
+  const [storeUrl, setStoreUrl] = useState('');
+  const [consumerKey, setConsumerKey] = useState('');
+  const [consumerSecret, setConsumerSecret] = useState('');
   const [isStoreTesting, setIsStoreTesting] = useState(false);
   const [storeStatus, setStoreStatus] = useState<{ connected: boolean; name?: string; error?: string } | null>(null);
 
   // AutoMate Config
-  const [automateBaseUrl, setAutomateBaseUrl] = useState('https://api.example.com/v1/store');
-  const [automateToken, setAutomateToken] = useState('Zf3q-demo-token-automate-43-character-string');
+  const [automateBaseUrl, setAutomateBaseUrl] = useState('');
+  const [automateToken, setAutomateToken] = useState('');
   const [isAutomateTesting, setIsAutomateTesting] = useState(false);
   const [automateStatus, setAutomateStatus] = useState<{ connected: boolean; shop?: string; store?: string; error?: string } | null>(null);
 
@@ -72,7 +72,6 @@ export default function App() {
     consumerKey,
     consumerSecret,
     accessToken: consumerKey,
-    isMock: storeUrl.includes('demo') || storeUrl.includes('mock') || storeUrl.includes('.local'),
   };
 
   const currentAutoMateConfig: AutoMateConfig = {
@@ -232,7 +231,6 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setPlatform('woocommerce');
-                    setStoreUrl('https://oitijjo-clothing.local');
                     setStoreStatus(null);
                   }}
                   className={`px-3 py-1 rounded text-xs font-semibold transition ${
@@ -245,7 +243,6 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setPlatform('shopify');
-                    setStoreUrl('banglar-fashion.myshopify.com');
                     setStoreStatus(null);
                   }}
                   className={`px-3 py-1 rounded text-xs font-semibold transition ${

@@ -4,7 +4,6 @@ import { AutoMateClient } from '../services/automate.client.js';
 import { AutoMateTransformer } from '../services/automate.transformer.js';
 import { ShopifyAdapter } from '../adapters/shopify.adapter.js';
 import { WooCommerceAdapter } from '../adapters/woocommerce.adapter.js';
-import { MockAdapter } from '../adapters/mock.adapter.js';
 
 export class BridgeController {
   /**
@@ -50,13 +49,7 @@ export class BridgeController {
    */
   static async testWooCommerceConnection(req: Request, res: Response): Promise<void> {
     try {
-      const { storeUrl, consumerKey, consumerSecret, isMock } = req.body;
-      if (isMock || storeUrl?.includes('demo') || storeUrl?.includes('mock')) {
-        const mock = new MockAdapter('woocommerce', storeUrl || 'https://oitijjo-clothing.local');
-        const test = await mock.testConnection();
-        res.json({ ok: true, storeName: test.storeName });
-        return;
-      }
+      const { storeUrl, consumerKey, consumerSecret } = req.body;
 
       if (!storeUrl || !consumerKey || !consumerSecret) {
         res.status(400).json({ ok: false, error: 'storeUrl, consumerKey, and consumerSecret are required.' });
@@ -81,13 +74,7 @@ export class BridgeController {
    */
   static async testShopifyConnection(req: Request, res: Response): Promise<void> {
     try {
-      const { storeDomain, accessToken, isMock } = req.body;
-      if (isMock || storeDomain?.includes('demo') || storeDomain?.includes('mock')) {
-        const mock = new MockAdapter('shopify', storeDomain || 'banglar-fashion.myshopify.com');
-        const test = await mock.testConnection();
-        res.json({ ok: true, storeName: test.storeName });
-        return;
-      }
+      const { storeDomain, accessToken } = req.body;
 
       if (!storeDomain || !accessToken) {
         res.status(400).json({ ok: false, error: 'storeDomain and accessToken are required.' });
@@ -197,25 +184,13 @@ export class BridgeController {
    * POST /api/bridge/sync/products
    */
   static async syncProductsStream(req: Request, res: Response): Promise<void> {
-    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken, isMock } = req.body;
+    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken } = req.body;
 
     try {
       const automate = BridgeController.resolveAutoMateClient(req);
-
       let productsToSync: any[] = [];
 
-      // 1. Fetch from Store
-      if (isMock || storeUrl?.includes('demo') || storeDomain?.includes('demo')) {
-        const mock = new MockAdapter(platform, storeDomain || storeUrl);
-        const res = await mock.fetchProducts(1, 50);
-        productsToSync = res.items.map((item) => ({
-          id: item.platformProductId,
-          name: item.title,
-          price: item.price,
-          status: 'publish',
-          description: 'High quality clothing apparel from Bangladesh',
-        }));
-      } else if (platform === 'woocommerce') {
+      if (platform === 'woocommerce') {
         if (!storeUrl || !consumerKey || !consumerSecret) {
           res.status(400).json({ ok: false, error: 'WooCommerce storeUrl, consumerKey, and consumerSecret are required.' });
           return;
@@ -234,6 +209,11 @@ export class BridgeController {
         });
         productsToSync = wcResponse.data || [];
       } else if (platform === 'shopify') {
+        if (!storeDomain || !accessToken) {
+          res.status(400).json({ ok: false, error: 'Shopify storeDomain and accessToken are required.' });
+          return;
+        }
+
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
         const fetched = await adapter.fetchProducts(undefined, 50);
         productsToSync = fetched.items.map((i) => ({
@@ -278,89 +258,22 @@ export class BridgeController {
   }
 
   /**
-   * Batch Fetch Orders from WooCommerce and Stream directly to AutoMate (Zero DB)
+   * Batch Fetch Orders from WooCommerce/Shopify and Stream directly to AutoMate (Zero DB)
    * POST /api/bridge/sync/orders
    */
   static async syncOrdersStream(req: Request, res: Response): Promise<void> {
-    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken, isMock } = req.body;
+    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken } = req.body;
 
     try {
       const automate = BridgeController.resolveAutoMateClient(req);
-
       let ordersToSync: any[] = [];
 
-      if (isMock || storeUrl?.includes('demo') || storeDomain?.includes('demo')) {
-        const mock = new MockAdapter(platform, storeDomain || storeUrl);
-        const res = await mock.fetchOrders(1, 50);
-        const mockCustomerMap: Record<string, { first_name: string; last_name: string; phone: string; address_1: string; city: string }> = {
-          cust_101: { first_name: 'Abdur', last_name: 'Rahman', phone: '+8801711223344', address_1: 'House 12, Road 5, Dhanmondi', city: 'Dhaka' },
-          cust_102: { first_name: 'Nusrat', last_name: 'Jahan', phone: '+8801819876543', address_1: 'Holding 45, GEC Circle', city: 'Chittagong' },
-          cust_103: { first_name: 'Tanvir', last_name: 'Ahmed', phone: '+8801912345678', address_1: 'Uposhohor Block-B', city: 'Sylhet' },
-        };
+      if (platform === 'shopify') {
+        if (!storeDomain || !accessToken) {
+          res.status(400).json({ ok: false, error: 'Shopify storeDomain and accessToken are required.' });
+          return;
+        }
 
-        ordersToSync = res.items.map((o) => {
-          const cust = (o.platformCustomerId && mockCustomerMap[o.platformCustomerId]) || {
-            first_name: 'Mahmudul',
-            last_name: 'Hasan',
-            phone: '+8801611002233',
-            address_1: 'Sector 4, Uttara',
-            city: 'Dhaka',
-          };
-
-          if (platform === 'shopify') {
-            return {
-              id: o.platformOrderId,
-              name: o.orderNumber,
-              total_price: o.totalPrice,
-              financial_status: 'paid',
-              customer: {
-                first_name: cust.first_name,
-                last_name: cust.last_name,
-                phone: cust.phone,
-              },
-              shipping_address: {
-                address1: cust.address_1,
-                city: cust.city,
-                country: 'Bangladesh',
-              },
-              line_items: o.lineItems.map((li) => ({
-                title: li.title,
-                quantity: li.quantity,
-                price: li.price,
-                sku: `SKU-${li.title.replace(/\s+/g, '-').toUpperCase()}`,
-              })),
-            };
-          }
-
-          return {
-            id: o.platformOrderId,
-            number: o.orderNumber,
-            total: o.totalPrice,
-            status: 'completed',
-            billing: {
-              first_name: cust.first_name,
-              last_name: cust.last_name,
-              phone: cust.phone,
-              address_1: cust.address_1,
-              city: cust.city,
-              country: 'BD',
-            },
-            shipping: {
-              first_name: cust.first_name,
-              last_name: cust.last_name,
-              address_1: cust.address_1,
-              city: cust.city,
-              country: 'BD',
-            },
-            line_items: o.lineItems.map((li) => ({
-              name: li.title,
-              quantity: li.quantity,
-              price: li.price,
-              sku: `SKU-${li.title.replace(/\s+/g, '-').toUpperCase()}`,
-            })),
-          };
-        });
-      } else if (platform === 'shopify') {
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
         const fetched = await adapter.fetchOrders(undefined, 25);
         ordersToSync = fetched.items.map((o) => ({
@@ -371,12 +284,12 @@ export class BridgeController {
           customer: {
             first_name: 'Customer',
             last_name: o.platformCustomerId,
-            phone: '+8801700000000',
+            phone: '',
           },
           shipping_address: {
-            address1: 'Dhaka Delivery Area',
-            city: 'Dhaka',
-            country: 'Bangladesh',
+            address1: '',
+            city: '',
+            country: '',
           },
           line_items: o.lineItems.map((li) => ({
             title: li.title,
@@ -386,6 +299,11 @@ export class BridgeController {
           })),
         }));
       } else if (platform === 'woocommerce') {
+        if (!storeUrl || !consumerKey || !consumerSecret) {
+          res.status(400).json({ ok: false, error: 'WooCommerce storeUrl, consumerKey, and consumerSecret are required.' });
+          return;
+        }
+
         let cleanUrl = storeUrl.trim().replace(/\/$/, '');
         if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
           cleanUrl = `https://${cleanUrl}`;

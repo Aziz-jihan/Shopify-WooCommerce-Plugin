@@ -61,35 +61,27 @@ export class WebhookController {
       }
 
       // 2. Strict Signature Verification
-      const isMockStore = Boolean(
-        store.accessToken === 'mock' ||
-        store.storeDomain.includes('demo') ||
-        store.storeDomain.includes('mock')
-      );
+      if (!hmacHeader || hmacHeader.trim() === '') {
+        console.warn(`[WebhookController] Missing Shopify HMAC signature header for store ${store.id}`);
+        res.status(401).send('Missing webhook signature header');
+        return;
+      }
 
-      if (!isMockStore) {
-        if (!hmacHeader || hmacHeader.trim() === '') {
-          console.warn(`[WebhookController] Missing Shopify HMAC signature header for store ${store.id}`);
-          res.status(401).send('Missing webhook signature header');
-          return;
-        }
+      // Shopify signs webhooks with the App's Client Secret (API Secret Key), stored in apiSecret
+      const verificationSecret = store.apiSecret;
+      if (!verificationSecret) {
+        console.error(`[WebhookController] Shopify App Client Secret (apiSecret) not configured for store ${store.id}`);
+        res.status(500).send('Store webhook verification secret not configured');
+        return;
+      }
 
-        // Shopify signs webhooks with the App's Client Secret (API Secret Key), stored in apiSecret
-        const verificationSecret = store.apiSecret;
-        if (!verificationSecret) {
-          console.error(`[WebhookController] Shopify App Client Secret (apiSecret) not configured for store ${store.id}`);
-          res.status(500).send('Store webhook verification secret not configured');
-          return;
-        }
+      const adapter = new ShopifyAdapter(store.storeDomain, store.accessToken);
+      const isValid = adapter.verifyWebhookSignature(req.rawBody, hmacHeader, verificationSecret);
 
-        const adapter = new ShopifyAdapter(store.storeDomain, store.accessToken);
-        const isValid = adapter.verifyWebhookSignature(req.rawBody, hmacHeader, verificationSecret);
-
-        if (!isValid) {
-          console.warn(`[WebhookController] Invalid Shopify HMAC signature for store ${store.id}`);
-          res.status(401).send('Invalid signature');
-          return;
-        }
+      if (!isValid) {
+        console.warn(`[WebhookController] Invalid Shopify HMAC signature for store ${store.id}`);
+        res.status(401).send('Invalid signature');
+        return;
       }
 
       // 3. Enqueue job for background processing
@@ -130,40 +122,32 @@ export class WebhookController {
       }
 
       // 2. Strict Signature Verification
-      const isMockStore = Boolean(
-        store.apiKey === 'mock' ||
-        store.storeDomain.includes('demo') ||
-        store.storeDomain.includes('mock')
+      if (!signature || signature.trim() === '') {
+        console.warn(`[WebhookController] Missing WooCommerce signature header for store ${store.id}`);
+        res.status(401).send('Missing webhook signature header');
+        return;
+      }
+
+      const verificationSecret = store.webhookSecret;
+      if (!verificationSecret) {
+        console.error(`[WebhookController] WooCommerce webhook secret not configured for store ${store.id}`);
+        res.status(500).send('Store webhook verification secret not configured');
+        return;
+      }
+
+      const adapter = new WooCommerceAdapter(
+        store.storeDomain,
+        store.apiKey,
+        store.apiSecret,
+        verificationSecret
       );
 
-      if (!isMockStore) {
-        if (!signature || signature.trim() === '') {
-          console.warn(`[WebhookController] Missing WooCommerce signature header for store ${store.id}`);
-          res.status(401).send('Missing webhook signature header');
-          return;
-        }
+      const isValid = adapter.verifyWebhookSignature(req.rawBody, signature, verificationSecret);
 
-        const verificationSecret = store.webhookSecret;
-        if (!verificationSecret) {
-          console.error(`[WebhookController] WooCommerce webhook secret not configured for store ${store.id}`);
-          res.status(500).send('Store webhook verification secret not configured');
-          return;
-        }
-
-        const adapter = new WooCommerceAdapter(
-          store.storeDomain,
-          store.apiKey,
-          store.apiSecret,
-          verificationSecret
-        );
-
-        const isValid = adapter.verifyWebhookSignature(req.rawBody, signature, verificationSecret);
-
-        if (!isValid) {
-          console.warn(`[WebhookController] Invalid WooCommerce signature for store ${store.id}`);
-          res.status(401).send('Invalid signature');
-          return;
-        }
+      if (!isValid) {
+        console.warn(`[WebhookController] Invalid WooCommerce signature for store ${store.id}`);
+        res.status(401).send('Invalid signature');
+        return;
       }
 
       // 3. Enqueue job for background processing
