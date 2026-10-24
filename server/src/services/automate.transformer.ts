@@ -128,16 +128,18 @@ export class AutoMateTransformer {
     const rawPrice = parseFloat(wcProduct.regular_price || wcProduct.price || '0');
     const rawSalePrice = parseFloat(wcProduct.sale_price || '0');
 
+    // Checklist Item 6: "product_id, variant_id and the product name are never null or empty. Leave status and a variant's name out (or send "") instead of null. Leave description out to keep AutoMate's ("" or null clears it)."
     const productPayload: AutoMateSyncProductPayload = {
       product_id: String(wcProduct.id),
-      name: (wcProduct.name || 'Untitled Product').substring(0, 500),
-      description: this.stripHtml(wcProduct.description || wcProduct.short_description || '').substring(0, 50000),
+      name: (wcProduct.name || 'Untitled Product').trim().substring(0, 500),
       price: isNaN(rawPrice) ? 0 : rawPrice,
       sale_price: isNaN(rawSalePrice) || rawSalePrice <= 0 ? undefined : rawSalePrice,
-      sku: wcProduct.sku ? String(wcProduct.sku).substring(0, 255) : undefined,
-      stock: wcProduct.stock_quantity !== null && wcProduct.stock_quantity !== undefined ? parseInt(String(wcProduct.stock_quantity), 10) : 0,
       status: wcProduct.status === 'publish' ? 'publish' : 'draft',
     };
+
+    if (wcProduct.description || wcProduct.short_description) {
+      productPayload.description = this.stripHtml(wcProduct.description || wcProduct.short_description).substring(0, 50000);
+    }
 
     // Determine variations source: passed array, or embedded variation objects in wcProduct
     const effectiveVariations: any[] = (Array.isArray(variations) && variations.length > 0)
@@ -147,7 +149,10 @@ export class AutoMateTransformer {
           : (Array.isArray(wcProduct.variation_products) ? wcProduct.variation_products : []));
 
     if (effectiveVariations && effectiveVariations.length > 0) {
-      productPayload.variants = effectiveVariations.map((v: any) => {
+      // Checklist Rule: At most 500 variants per product
+      const cappedVariations = effectiveVariations.slice(0, 500);
+
+      productPayload.variants = cappedVariations.map((v: any) => {
         const vRegularPrice = parseFloat(v.regular_price || v.price || wcProduct.regular_price || wcProduct.price || '0');
         const vSalePrice = parseFloat(v.sale_price || '0');
 
@@ -165,10 +170,13 @@ export class AutoMateTransformer {
           ? parseInt(String(v.stock_quantity), 10)
           : (v.manage_stock ? 0 : (v.stock_status === 'instock' ? 100 : 0));
 
+        // Checklist Item 7: "Send a SKU only as the website has it, and leave the field out when the website has none: "" or null removes the AutoMate SKU of a linked variant (WooCommerce variations without their own SKU send "")."
+        const variantSku = v.sku ? String(v.sku).trim().substring(0, 255) : '';
+
         const variantObj: AutoMateVariant = {
           variant_id: String(v.id),
           name: variantName.substring(0, 600),
-          sku: v.sku ? String(v.sku).substring(0, 255) : undefined,
+          sku: variantSku,
           price: isNaN(vRegularPrice) || vRegularPrice <= 0 ? (productPayload.price || 0) : vRegularPrice,
           sale_price: isNaN(vSalePrice) || vSalePrice <= 0 ? undefined : vSalePrice,
           stock: variantStock,
@@ -176,7 +184,7 @@ export class AutoMateTransformer {
         return variantObj;
       });
 
-      // If parent price was 0 or not given (common for variable products), use the lowest variant price
+      // If parent price was 0 or not given (standard for WooCommerce variable products), use the lowest variant price
       if (productPayload.price === 0 && productPayload.variants.length > 0) {
         const prices = productPayload.variants
           .map((v) => v.price)
@@ -185,6 +193,14 @@ export class AutoMateTransformer {
           productPayload.price = Math.min(...prices);
         }
       }
+    } else {
+      // Product without variants: include product-level sku and stock
+      if (wcProduct.sku) {
+        productPayload.sku = String(wcProduct.sku).trim().substring(0, 255);
+      }
+      productPayload.stock = wcProduct.stock_quantity !== null && wcProduct.stock_quantity !== undefined
+        ? parseInt(String(wcProduct.stock_quantity), 10)
+        : 0;
     }
 
     return productPayload;
@@ -228,12 +244,19 @@ export class AutoMateTransformer {
 
     const rawLines = shopifyOrder.line_items || shopifyOrder.lineItems?.edges?.map((e: any) => e.node) || [];
     const lines: AutoMateOrderProductLine[] = rawLines.map((item: any) => {
+      const prodId = item.product_id
+        || item.product?.legacyResourceId
+        || (item.product?.id ? String(item.product.id).replace('gid://shopify/Product/', '') : undefined);
+      const varId = item.variant_id
+        || item.variant?.legacyResourceId
+        || (item.variant?.id ? String(item.variant.id).replace('gid://shopify/ProductVariant/', '') : undefined);
+
       return {
         name: (item.title || item.name || 'Shopify Product').substring(0, 255),
         quantity: parseInt(String(item.quantity || 1), 10),
         sku: item.sku ? String(item.sku).substring(0, 255) : undefined,
-        product_id: item.product_id ? String(item.product_id) : undefined,
-        variant_id: item.variant_id ? String(item.variant_id) : undefined,
+        product_id: prodId ? String(prodId) : undefined,
+        variant_id: varId ? String(varId) : undefined,
       };
     });
 
@@ -268,14 +291,18 @@ export class AutoMateTransformer {
 
     const payload: AutoMateSyncProductPayload = {
       product_id: productId,
-      name: (shopifyProduct.title || 'Shopify Product').substring(0, 500),
-      description: this.stripHtml(shopifyProduct.descriptionHtml || shopifyProduct.body_html || shopifyProduct.description || '').substring(0, 50000),
+      name: (shopifyProduct.title || 'Shopify Product').trim().substring(0, 500),
       price: isNaN(basePrice) ? 0 : basePrice,
       status: shopifyProduct.status === 'ACTIVE' || shopifyProduct.status === 'active' ? 'publish' : 'draft',
     };
 
+    if (shopifyProduct.descriptionHtml || shopifyProduct.body_html || shopifyProduct.description) {
+      payload.description = this.stripHtml(shopifyProduct.descriptionHtml || shopifyProduct.body_html || shopifyProduct.description).substring(0, 50000);
+    }
+
     if (rawVariants.length > 0) {
-      payload.variants = rawVariants.map((v: any) => {
+      const cappedVariants = rawVariants.slice(0, 500);
+      payload.variants = cappedVariants.map((v: any) => {
         const vId = String(v.legacyResourceId || v.id).replace('gid://shopify/ProductVariant/', '');
         const vPrice = parseFloat(String(v.price || basePrice));
         const vCompareAt = parseFloat(String(v.compare_at_price || v.compareAtPrice || '0'));
@@ -295,13 +322,18 @@ export class AutoMateTransformer {
         const variantObj: AutoMateVariant = {
           variant_id: vId,
           name: (v.title && v.title !== 'Default Title' ? `${shopifyProduct.title} - ${v.title}` : shopifyProduct.title).substring(0, 600),
-          sku: v.sku ? String(v.sku).substring(0, 255) : undefined,
+          sku: v.sku ? String(v.sku).trim().substring(0, 255) : undefined,
           price: regularPrice,
           sale_price: salePrice,
           stock: stockQuantity,
         };
         return variantObj;
       });
+    } else {
+      if (shopifyProduct.sku) {
+        payload.sku = String(shopifyProduct.sku).trim().substring(0, 255);
+      }
+      payload.stock = 0;
     }
 
     return payload;

@@ -152,6 +152,20 @@ export class BridgeController {
       }
 
       const platform = (req.headers['x-platform'] as string) || (req.headers['x-shopify-topic'] ? 'shopify' : 'woocommerce');
+
+      // CRITICAL CHECKLIST CHECK:
+      // If a WooCommerce webhook sends a child variation (parent_id > 0 or type === 'variation'),
+      // DO NOT save it as a separate product! Product variations must always live UNDER the parent product!
+      if (platform === 'woocommerce' && (rawPayload.parent_id || rawPayload.type === 'variation')) {
+        console.log(`[Bridge] Webhook received for child variation #${rawPayload.id} (parent #${rawPayload.parent_id}). Not creating separate product.`);
+        res.status(200).json({
+          ok: true,
+          message: 'Ignored child variation webhook: variations must be synced under their parent product, not created as separate products.',
+          parent_id: rawPayload.parent_id,
+        });
+        return;
+      }
+
       let automatePayload;
 
       if (platform === 'shopify') {
@@ -208,11 +222,16 @@ export class BridgeController {
         try {
           const wcResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/products`, {
             headers: { Authorization: `Basic ${authHeader}` },
-            params: { per_page: limit || 20 },
+            params: { per_page: limit || 20, parent: 0 },
             timeout: 60000,
             httpsAgent,
           });
-          productsToSync = wcResponse.data || [];
+          const rawItems = wcResponse.data || [];
+          // CRITICAL: Filter out any child variations or items with parent_id > 0
+          // Variations MUST only be saved inside their parent product's variants[] array, NEVER as separate products!
+          productsToSync = rawItems.filter(
+            (p: any) => (!p.parent_id || p.parent_id === 0) && p.type !== 'variation'
+          );
         } catch (fetchErr: any) {
           const errDetail = fetchErr.response?.data?.message || fetchErr.message;
           throw new Error(`WooCommerce API Error (Products): ${errDetail}`);
@@ -238,7 +257,7 @@ export class BridgeController {
         });
       }
 
-      console.log(`[Bridge] Fetched ${productsToSync.length} products. Streaming directly to AutoMate...`);
+      console.log(`[Bridge] Fetched ${productsToSync.length} parent products. Streaming directly to AutoMate...`);
 
       const results = [];
       for (const p of productsToSync) {
@@ -266,6 +285,19 @@ export class BridgeController {
               console.warn(`[Bridge] Warning: Could not fetch variations for WC product #${p.id}:`, varErr.message);
             }
           }
+
+          // Checklist Rule 5: "never variants: [] for a product that has variants."
+          if (variations.length === 0 && Array.isArray(p.variations) && p.variations.length > 0) {
+            console.warn(`[Bridge] Skipping product #${p.id} sync because variations could not be loaded and checklist requires never sending empty variants for variable products.`);
+            results.push({
+              id: p.id,
+              name: p.name,
+              variantsCount: 0,
+              success: false,
+              error: 'Skipped to prevent overwriting AutoMate catalog: variable product variations could not be retrieved from WooCommerce.',
+            });
+            continue;
+          }
         }
 
         const payload = platform === 'shopify' 
@@ -291,8 +323,8 @@ export class BridgeController {
           });
         }
 
-        // 500ms pacing as requested by AutoMate rate-limit spec (max 2 requests/sec)
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Checklist Item 15: Pace the first full product sync at about 1 request a second (1000ms)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       res.json({
