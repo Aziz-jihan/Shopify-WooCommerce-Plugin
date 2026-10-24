@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
+import https from 'https';
 import { AutoMateClient } from '../services/automate.client.js';
 import { AutoMateTransformer } from '../services/automate.transformer.js';
 import { ShopifyAdapter } from '../adapters/shopify.adapter.js';
@@ -49,14 +50,14 @@ export class BridgeController {
    */
   static async testWooCommerceConnection(req: Request, res: Response): Promise<void> {
     try {
-      const { storeUrl, consumerKey, consumerSecret } = req.body;
+      const { storeUrl, consumerKey, consumerSecret, ignoreCert = true } = req.body;
 
       if (!storeUrl || !consumerKey || !consumerSecret) {
         res.status(400).json({ ok: false, error: 'storeUrl, consumerKey, and consumerSecret are required.' });
         return;
       }
 
-      const adapter = new WooCommerceAdapter(storeUrl, consumerKey, consumerSecret);
+      const adapter = new WooCommerceAdapter(storeUrl, consumerKey, consumerSecret, '', ignoreCert);
       const test = await adapter.testConnection();
       if (test.success) {
         res.json({ ok: true, storeName: test.storeName });
@@ -184,7 +185,7 @@ export class BridgeController {
    * POST /api/bridge/sync/products
    */
   static async syncProductsStream(req: Request, res: Response): Promise<void> {
-    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken } = req.body;
+    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken, limit, ignoreCert = true } = req.body;
 
     try {
       const automate = BridgeController.resolveAutoMateClient(req);
@@ -202,12 +203,20 @@ export class BridgeController {
         }
 
         const authHeader = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-        const wcResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/products`, {
-          headers: { Authorization: `Basic ${authHeader}` },
-          params: { per_page: 50 },
-          timeout: 20000,
-        });
-        productsToSync = wcResponse.data || [];
+        const httpsAgent = new https.Agent({ rejectUnauthorized: !ignoreCert, keepAlive: true });
+        
+        try {
+          const wcResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/products`, {
+            headers: { Authorization: `Basic ${authHeader}` },
+            params: { per_page: limit || 20 },
+            timeout: 60000,
+            httpsAgent,
+          });
+          productsToSync = wcResponse.data || [];
+        } catch (fetchErr: any) {
+          const errDetail = fetchErr.response?.data?.message || fetchErr.message;
+          throw new Error(`WooCommerce API Error (Products): ${errDetail}`);
+        }
       } else if (platform === 'shopify') {
         if (!storeDomain || !accessToken) {
           res.status(400).json({ ok: false, error: 'Shopify storeDomain and accessToken are required.' });
@@ -215,7 +224,7 @@ export class BridgeController {
         }
 
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
-        const fetched = await adapter.fetchProducts(undefined, 50);
+        const fetched = await adapter.fetchProducts(undefined, limit || 20);
         productsToSync = fetched.items.map((i) => ({
           id: i.platformProductId,
           title: i.title,
@@ -262,7 +271,7 @@ export class BridgeController {
    * POST /api/bridge/sync/orders
    */
   static async syncOrdersStream(req: Request, res: Response): Promise<void> {
-    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken } = req.body;
+    const { platform = 'woocommerce', storeUrl, storeDomain, consumerKey, consumerSecret, accessToken, limit, ignoreCert = true } = req.body;
 
     try {
       const automate = BridgeController.resolveAutoMateClient(req);
@@ -275,7 +284,7 @@ export class BridgeController {
         }
 
         const adapter = new ShopifyAdapter(storeDomain, accessToken);
-        const fetched = await adapter.fetchOrders(undefined, 25);
+        const fetched = await adapter.fetchOrders(undefined, limit || 20);
         ordersToSync = fetched.items.map((o) => ({
           id: o.platformOrderId,
           name: o.orderNumber,
@@ -310,12 +319,31 @@ export class BridgeController {
         }
 
         const authHeader = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-        const wcResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/orders`, {
-          headers: { Authorization: `Basic ${authHeader}` },
-          params: { per_page: 25, status: 'processing,completed' },
-          timeout: 20000,
-        });
-        ordersToSync = wcResponse.data || [];
+        const httpsAgent = new https.Agent({ rejectUnauthorized: !ignoreCert, keepAlive: true });
+
+        try {
+          const wcResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/orders`, {
+            headers: { Authorization: `Basic ${authHeader}` },
+            params: { per_page: limit || 20, status: 'processing,completed' },
+            timeout: 60000,
+            httpsAgent,
+          });
+          ordersToSync = wcResponse.data || [];
+        } catch (fetchErr: any) {
+          // If status filter failed or was slow, try falling back to general order query without status filter
+          try {
+            const fallbackResponse = await axios.get(`${cleanUrl}/wp-json/wc/v3/orders`, {
+              headers: { Authorization: `Basic ${authHeader}` },
+              params: { per_page: limit || 20 },
+              timeout: 60000,
+              httpsAgent,
+            });
+            ordersToSync = fallbackResponse.data || [];
+          } catch (innerErr: any) {
+            const errDetail = innerErr.response?.data?.message || fetchErr.response?.data?.message || fetchErr.message;
+            throw new Error(`WooCommerce API Error (Orders): ${errDetail}`);
+          }
+        }
       }
 
       console.log(`[Bridge] Fetched ${ordersToSync.length} orders. Streaming directly to AutoMate...`);

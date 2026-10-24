@@ -31,7 +31,7 @@ export class ShopifyAdapter implements ECommerceAdapter {
         'Content-Type': 'application/json',
         'X-Shopify-Access-Token': this.accessToken,
       },
-      timeout: 15000,
+      timeout: 60000,
     });
   }
 

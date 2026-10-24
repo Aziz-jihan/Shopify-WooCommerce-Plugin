@@ -90,7 +90,7 @@ export class AutoMateClient {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.token}`,
       },
-      timeout: 20000,
+      timeout: 60000,
     });
   }
 

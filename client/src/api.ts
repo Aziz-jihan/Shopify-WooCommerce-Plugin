@@ -47,6 +47,7 @@ export const api = {
         consumerKey: store.consumerKey,
         consumerSecret: store.consumerSecret,
         accessToken: store.accessToken,
+        ignoreCert: true,
       }),
     });
     const data = await res.json();
@@ -71,6 +72,7 @@ export const api = {
         accessToken: store.accessToken,
         automateBaseUrl: automate.baseUrl,
         automateToken: automate.token,
+        ignoreCert: true,
       }),
     });
     const data = await res.json();
@@ -95,6 +97,7 @@ export const api = {
         accessToken: store.accessToken,
         automateBaseUrl: automate.baseUrl,
         automateToken: automate.token,
+        ignoreCert: true,
       }),
     });
     const data = await res.json();

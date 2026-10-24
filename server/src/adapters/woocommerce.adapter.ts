@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
+import https from 'https';
 import {
   ECommerceAdapter,
   PaginatedResult,
@@ -14,8 +15,9 @@ export class WooCommerceAdapter implements ECommerceAdapter {
   private client: AxiosInstance;
   private storeUrl: string;
   private webhookSecret: string;
+  private ignoreCert: boolean;
 
-  constructor(storeUrl: string, consumerKey: string, consumerSecret: string, webhookSecret = '') {
+  constructor(storeUrl: string, consumerKey: string, consumerSecret: string, webhookSecret = '', ignoreCert = true) {
     // Normalize store URL: ensure https:// and strip trailing slash
     let cleanUrl = storeUrl.trim();
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
@@ -24,17 +26,24 @@ export class WooCommerceAdapter implements ECommerceAdapter {
     cleanUrl = cleanUrl.replace(/\/$/, '');
     this.storeUrl = cleanUrl;
     this.webhookSecret = webhookSecret;
+    this.ignoreCert = ignoreCert;
 
     const authHeader = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
 
-    this.client = axios.create({
+    const axiosConfig: any = {
       baseURL: `${this.storeUrl}/wp-json/wc/v3`,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Basic ${authHeader}`,
       },
-      timeout: 15000,
-    });
+      timeout: 60000, // increased timeout to 60s for slower stores
+    };
+    // If ignoreCert flag is true, allow self‑signed certificates
+    if (this.ignoreCert) {
+      axiosConfig.httpsAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: true });
+    }
+    this.client = axios.create(axiosConfig);
+
   }
 
   async testConnection(): Promise<{ success: boolean; storeName?: string; error?: string }> {
