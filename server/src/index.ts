@@ -34,6 +34,9 @@ app.use(cors({
     'X-Shopify-Shop-Domain',
     'X-WC-Webhook-Signature',
     'X-WC-Webhook-Topic',
+    'x-automate-base-url',
+    'x-automate-token',
+    'x-store-platform',
   ],
 }));
 

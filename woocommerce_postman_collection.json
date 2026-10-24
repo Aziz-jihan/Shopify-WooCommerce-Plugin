@@ -40,6 +40,16 @@
       "key": "wooStoreId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "automateBaseUrl",
+      "value": "mock",
+      "type": "string"
+    },
+    {
+      "key": "automateToken",
+      "value": "mock_token_43_characters_demo_key_example",
+      "type": "string"
     }
   ],
   "item": [
@@ -58,6 +68,137 @@
               "raw": "{{baseUrl}}/health",
               "host": ["{{baseUrl}}"],
               "path": ["health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - AutoMate Stateless Bridge (Zero Database)",
+      "item": [
+        {
+          "name": "1. Test AutoMate Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-automate-base-url", "value": "{{automateBaseUrl}}" },
+              { "key": "x-automate-token", "value": "{{automateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"automateBaseUrl\": \"{{automateBaseUrl}}\",\n  \"automateToken\": \"{{automateToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/automate/test-connection",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "automate", "test-connection"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Test WooCommerce Connection (Stateless)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"woocommerce\",\n  \"storeUrl\": \"https://oitijjo-clothing.local\",\n  \"consumerKey\": \"ck_mock_demo_consumer_key_111\",\n  \"consumerSecret\": \"cs_mock_demo_consumer_secret_222\",\n  \"isMock\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/woocommerce/test-connection",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "woocommerce", "test-connection"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Stream WooCommerce Historical Clothes to AutoMate (Zero DB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-automate-base-url", "value": "{{automateBaseUrl}}" },
+              { "key": "x-automate-token", "value": "{{automateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"woocommerce\",\n  \"storeUrl\": \"https://oitijjo-clothing.local\",\n  \"consumerKey\": \"ck_mock_demo_consumer_key_111\",\n  \"consumerSecret\": \"cs_mock_demo_consumer_secret_222\",\n  \"isMock\": true,\n  \"automateBaseUrl\": \"{{automateBaseUrl}}\",\n  \"automateToken\": \"{{automateToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/sync/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "sync", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Stream WooCommerce Historical Orders to AutoMate (Zero DB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-automate-base-url", "value": "{{automateBaseUrl}}" },
+              { "key": "x-automate-token", "value": "{{automateToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"woocommerce\",\n  \"storeUrl\": \"https://oitijjo-clothing.local\",\n  \"consumerKey\": \"ck_mock_demo_consumer_key_111\",\n  \"consumerSecret\": \"cs_mock_demo_consumer_secret_222\",\n  \"isMock\": true,\n  \"automateBaseUrl\": \"{{automateBaseUrl}}\",\n  \"automateToken\": \"{{automateToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/sync/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "sync", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Forward WooCommerce Order Webhook to AutoMate (Abdur Rahman)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-automate-base-url", "value": "{{automateBaseUrl}}" },
+              { "key": "x-automate-token", "value": "{{automateToken}}" },
+              { "key": "x-platform", "value": "woocommerce" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 10501,\n  \"number\": \"WC-10501\",\n  \"status\": \"processing\",\n  \"total\": \"4200.00\",\n  \"customer_note\": \"Urgent Eid delivery please.\",\n  \"billing\": {\n    \"first_name\": \"Abdur\",\n    \"last_name\": \"Rahman\",\n    \"phone\": \"01711223344\",\n    \"address_1\": \"House 12, Road 5, Dhanmondi\",\n    \"city\": \"Dhaka\",\n    \"country\": \"BD\"\n  },\n  \"shipping\": {\n    \"first_name\": \"Abdur\",\n    \"last_name\": \"Rahman\",\n    \"address_1\": \"House 12, Road 5, Dhanmondi\",\n    \"city\": \"Dhaka\",\n    \"country\": \"BD\"\n  },\n  \"line_items\": [\n    {\n      \"id\": 101,\n      \"product_id\": 5001,\n      \"name\": \"Premium Cotton Panjabi - Charcoal Black\",\n      \"quantity\": 1,\n      \"price\": \"2800.00\",\n      \"sku\": \"PANJABI-BLK-01\"\n    },\n    {\n      \"id\": 102,\n      \"product_id\": 5002,\n      \"name\": \"Silk Pajama - Pearl White\",\n      \"quantity\": 1,\n      \"price\": \"1400.00\",\n      \"sku\": \"PAJAMA-WHT-01\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/webhook/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "webhook", "order"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Forward WooCommerce Product Webhook to AutoMate (Oxford Shirt)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-automate-base-url", "value": "{{automateBaseUrl}}" },
+              { "key": "x-automate-token", "value": "{{automateToken}}" },
+              { "key": "x-platform", "value": "woocommerce" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 8802,\n  \"name\": \"Semi-Formal Oxford Cotton Shirt - Light Blue\",\n  \"description\": \"<p>100% fine cotton breathable formal shirt tailored for regular fit.</p>\",\n  \"regular_price\": \"1900.00\",\n  \"sale_price\": \"1750.00\",\n  \"sku\": \"SHIRT-OXF-BLU\",\n  \"status\": \"publish\",\n  \"stock_quantity\": 45,\n  \"variations\": [\n    {\n      \"id\": 88021,\n      \"attributes\": [{ \"name\": \"Size\", \"option\": \"M\" }],\n      \"regular_price\": \"1900.00\",\n      \"sale_price\": \"1750.00\",\n      \"stock_quantity\": 20,\n      \"sku\": \"SHIRT-OXF-BLU-M\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bridge/webhook/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bridge", "webhook", "product"]
             }
           },
           "response": []

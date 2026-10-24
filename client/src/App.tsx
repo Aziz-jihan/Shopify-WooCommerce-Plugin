@@ -1,209 +1,525 @@
-import { useState, useEffect } from 'react';
-import { api, Store } from './api.ts';
-import { ConnectStoreModal } from './components/ConnectStoreModal.tsx';
-import { StoreDetail } from './components/StoreDetail.tsx';
+import { useState } from 'react';
+import { api, AutoMateConfig, StoreConfig } from './api';
 import {
-  ShoppingBag,
-  Store as StoreIcon,
-  Plus,
-  RefreshCw,
-  Database,
-  ArrowRight,
-  ShieldCheck,
   Zap,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Store as StoreIcon,
+  ShoppingBag,
+  ExternalLink,
+  Send,
+  Terminal,
+  ShieldCheck,
+  Package,
+  ShoppingCart,
+  Copy,
+  Check,
 } from 'lucide-react';
 
-export default function App() {
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+  message: string;
+}
 
-  const loadStores = async () => {
-    setIsLoading(true);
+export default function App() {
+  // Store Config
+  const [platform, setPlatform] = useState<'woocommerce' | 'shopify'>('woocommerce');
+  const [storeUrl, setStoreUrl] = useState('https://oitijjo-clothing.local');
+  const [consumerKey, setConsumerKey] = useState('ck_mock_demo_consumer_key_111');
+  const [consumerSecret, setConsumerSecret] = useState('cs_mock_demo_consumer_secret_222');
+  const [isStoreTesting, setIsStoreTesting] = useState(false);
+  const [storeStatus, setStoreStatus] = useState<{ connected: boolean; name?: string; error?: string } | null>(null);
+
+  // AutoMate Config
+  const [automateBaseUrl, setAutomateBaseUrl] = useState('https://api.example.com/v1/store');
+  const [automateToken, setAutomateToken] = useState('Zf3q-demo-token-automate-43-character-string');
+  const [isAutomateTesting, setIsAutomateTesting] = useState(false);
+  const [automateStatus, setAutomateStatus] = useState<{ connected: boolean; shop?: string; store?: string; error?: string } | null>(null);
+
+  // Sync state
+  const [isSyncingProducts, setIsSyncingProducts] = useState(false);
+  const [isSyncingOrders, setIsSyncingOrders] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([
+    {
+      id: 'init-1',
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'info',
+      message: 'Stateless AutoMate Bridge initialized. No database required.',
+    },
+  ]);
+
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  const addLog = (type: LogEntry['type'], message: string) => {
+    setLogs((prev) => [
+      {
+        id: Math.random().toString(36).substring(7),
+        timestamp: new Date().toLocaleTimeString(),
+        type,
+        message,
+      },
+      ...prev.slice(0, 49),
+    ]);
+  };
+
+  const currentStoreConfig: StoreConfig = {
+    platform,
+    storeUrl,
+    storeDomain: storeUrl,
+    consumerKey,
+    consumerSecret,
+    accessToken: consumerKey,
+    isMock: storeUrl.includes('demo') || storeUrl.includes('mock') || storeUrl.includes('.local'),
+  };
+
+  const currentAutoMateConfig: AutoMateConfig = {
+    baseUrl: automateBaseUrl,
+    token: automateToken,
+  };
+
+  const handleTestStore = async () => {
+    setIsStoreTesting(true);
+    setStoreStatus(null);
+    addLog('info', `Testing connection to ${platform === 'woocommerce' ? 'WooCommerce' : 'Shopify'} store...`);
     try {
-      const res = await api.listStores();
-      setStores(res.stores);
-    } catch (err) {
-      console.error(err);
+      const res = await api.testStoreConnection(currentStoreConfig);
+      setStoreStatus({ connected: true, name: res.storeName });
+      addLog('success', `Store verified successfully: "${res.storeName}"`);
+    } catch (err: any) {
+      setStoreStatus({ connected: false, error: err.message });
+      addLog('error', `Store connection failed: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setIsStoreTesting(false);
     }
   };
 
-  useEffect(() => {
-    loadStores();
-  }, []);
+  const handleTestAutoMate = async () => {
+    setIsAutomateTesting(true);
+    setAutomateStatus(null);
+    addLog('info', `Testing connection to AutoMate (${automateBaseUrl})...`);
+    try {
+      const res = await api.testAutoMateConnection(currentAutoMateConfig);
+      setAutomateStatus({ connected: true, shop: res.shop, store: res.store });
+      addLog('success', `AutoMate verified! Shop: "${res.shop}", Connected Store: "${res.store}"`);
+    } catch (err: any) {
+      setAutomateStatus({ connected: false, error: err.message });
+      addLog('error', `AutoMate verification failed: ${err.message}`);
+    } finally {
+      setIsAutomateTesting(false);
+    }
+  };
+
+  const handleSyncProducts = async () => {
+    setIsSyncingProducts(true);
+    addLog('info', `Fetching products from ${platform} and streaming directly to AutoMate...`);
+    try {
+      const res = await api.syncProductsToAutoMate(currentStoreConfig, currentAutoMateConfig);
+      addLog('success', `Batch product sync finished! Total fetched: ${res.totalFetched}, Synced to AutoMate: ${res.synced}, Failed: ${res.failed}`);
+      if (res.items) {
+        res.items.forEach((item: any) => {
+          if (item.success) {
+            addLog('info', `-> Product synced: "${item.name}" (ID: ${item.id})`);
+          } else {
+            addLog('warning', `-> Product failed: "${item.name}" - ${item.error}`);
+          }
+        });
+      }
+    } catch (err: any) {
+      addLog('error', `Product sync error: ${err.message}`);
+    } finally {
+      setIsSyncingProducts(false);
+    }
+  };
+
+  const handleSyncOrders = async () => {
+    setIsSyncingOrders(true);
+    addLog('info', `Fetching confirmed orders from ${platform} and forwarding directly to AutoMate...`);
+    try {
+      const res = await api.syncOrdersToAutoMate(currentStoreConfig, currentAutoMateConfig);
+      addLog('success', `Batch order sync finished! Total fetched: ${res.totalFetched}, Created in AutoMate: ${res.synced}, Failed: ${res.failed}`);
+      if (res.items) {
+        res.items.forEach((item: any) => {
+          if (item.success) {
+            const invoice = item.autoMate?.invoiceId ? `Invoice #${item.autoMate.invoiceId}` : 'Success';
+            addLog('info', `-> Order #${item.order_id} created for ${item.name} (${invoice})`);
+          } else {
+            addLog('warning', `-> Order #${item.order_id} failed: ${item.error}`);
+          }
+        });
+      }
+    } catch (err: any) {
+      addLog('error', `Order sync error: ${err.message}`);
+    } finally {
+      setIsSyncingOrders(false);
+    }
+  };
+
+  const webhookUrl = `${window.location.origin}/api/bridge/webhook/order`;
+
+  const copyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
+  };
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
       {/* Top Navigation */}
-      <header className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur sticky top-0 z-40">
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedStoreId(null)}>
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30">
-              <Database className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+              <Zap className="w-5 h-5" />
             </div>
             <div>
-              <span className="font-bold text-lg text-white">E-Commerce Sync</span>
-              <span className="text-xs text-slate-400 ml-2 border border-slate-700 rounded px-1.5 py-0.5">PostgreSQL Engine</span>
+              <span className="font-bold text-lg text-white">AutoMate Store Bridge</span>
+              <span className="text-xs text-emerald-400 font-semibold ml-2 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">
+                Stateless / Zero-DB Mode
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsConnectModalOpen(true)}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition shadow-lg shadow-indigo-600/20"
-            >
-              <Plus className="w-4 h-4" /> Connect Store
-            </button>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              Direct In-Memory Streaming
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {selectedStoreId ? (
-          <StoreDetail storeId={selectedStoreId} onBack={() => { setSelectedStoreId(null); loadStores(); }} />
-        ) : (
-          <div className="space-y-8">
-            {/* Hero / Value Banner */}
-            <div className="rounded-3xl p-8 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 relative overflow-hidden">
-              <div className="relative z-10 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-4">
-                  <Zap className="w-3.5 h-3.5" /> Two-Phase Sync Engine
-                </div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
-                  Unified Customer Data Pipeline
-                </h1>
-                <p className="mt-3 text-slate-400 text-sm sm:text-base leading-relaxed">
-                  Seamlessly sync historical customers, orders, and products from <strong>Shopify</strong> and <strong>WooCommerce</strong> into your PostgreSQL database, and keep everything in real-time sync with automated webhooks.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-4 text-xs text-slate-300">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" /> HMAC-SHA256 Signed
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-indigo-400" /> Automatic Webhook Dispatch
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Database className="w-4 h-4 text-purple-400" /> PostgreSQL Persistence
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Stores List */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Architecture Notice */}
+        <div className="rounded-2xl p-6 bg-gradient-to-r from-slate-900 via-indigo-950/20 to-slate-900 border border-slate-800">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-white">Connected Stores ({stores.length})</h2>
-                <button
-                  onClick={loadStores}
-                  disabled={isLoading}
-                  className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-
-              {isLoading && stores.length === 0 ? (
-                <div className="text-center py-16 text-slate-400">
-                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-indigo-400" />
-                  Loading connected stores...
-                </div>
-              ) : stores.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center bg-slate-900/30">
-                  <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4">
-                    <StoreIcon className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-semibold text-white mb-1">No stores connected yet</h3>
-                  <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
-                    Connect your first Shopify or WooCommerce store to start synchronizing customer records into PostgreSQL.
-                  </p>
-                  <button
-                    onClick={() => setIsConnectModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition shadow-lg shadow-indigo-600/20"
-                  >
-                    <Plus className="w-4 h-4" /> Connect Your First Store
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stores.map((s) => (
-                    <div
-                      key={s.id}
-                      onClick={() => setSelectedStoreId(s.id)}
-                      className="group rounded-2xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/40 hover:border-slate-700 p-6 transition cursor-pointer flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div
-                            className={`p-2.5 rounded-xl ${
-                              s.platform === 'shopify'
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-purple-500/10 text-purple-400'
-                            }`}
-                          >
-                            {s.platform === 'shopify' ? (
-                              <ShoppingBag className="w-6 h-6" />
-                            ) : (
-                              <StoreIcon className="w-6 h-6" />
-                            )}
-                          </div>
-                          <span
-                            className={`text-xs uppercase font-bold px-2 py-0.5 rounded ${
-                              s.platform === 'shopify'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                            }`}
-                          >
-                            {s.platform}
-                          </span>
-                        </div>
-
-                        <h3 className="font-bold text-white text-base group-hover:text-indigo-400 transition">
-                          {s.storeName || s.storeDomain}
-                        </h3>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5 truncate">{s.storeDomain}</p>
-
-                        <div className="grid grid-cols-3 gap-2 mt-6 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-center">
-                          <div>
-                            <div className="text-lg font-bold text-white">{s._count?.customers || 0}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-400">Customers</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold text-white">{s._count?.orders || 0}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-400">Orders</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold text-white">{s._count?.products || 0}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-400">Products</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                        <span>
-                          {s.lastSyncedAt ? `Synced ${new Date(s.lastSyncedAt).toLocaleDateString()}` : 'Not synced yet'}
-                        </span>
-                        <span className="flex items-center font-semibold text-indigo-400 group-hover:translate-x-1 transition-transform">
-                          Open <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                Direct E-Commerce to AutoMate Pipeline
+              </h2>
+              <p className="text-sm text-slate-400 mt-1 max-w-2xl">
+                This plugin does not require or touch any database. When an order or product event occurs, it transforms the data in memory and streams it directly to your AutoMate shop.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs bg-slate-950/60 px-4 py-3 rounded-xl border border-slate-800/80">
+              <span className="text-slate-400">AutoMate Target:</span>
+              <span className="font-mono text-indigo-400 truncate max-w-xs">{automateBaseUrl}</span>
             </div>
           </div>
-        )}
-      </main>
+        </div>
 
-      <ConnectStoreModal
-        isOpen={isConnectModalOpen}
-        onClose={() => setIsConnectModalOpen(false)}
-        onSuccess={() => loadStores()}
-      />
+        {/* Configuration Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Step 1: E-Commerce Store */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  {platform === 'woocommerce' ? <StoreIcon className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">1. E-Commerce Store Source</h3>
+                  <p className="text-xs text-slate-400">Configure your WooCommerce or Shopify store</p>
+                </div>
+              </div>
+
+              {/* Platform Switcher */}
+              <div className="flex rounded-lg bg-slate-800 p-1 border border-slate-700/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlatform('woocommerce');
+                    setStoreUrl('https://oitijjo-clothing.local');
+                    setStoreStatus(null);
+                  }}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                    platform === 'woocommerce' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  WooCommerce
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlatform('shopify');
+                    setStoreUrl('banglar-fashion.myshopify.com');
+                    setStoreStatus(null);
+                  }}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                    platform === 'shopify' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Shopify
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  {platform === 'woocommerce' ? 'Store URL' : 'Shopify Domain'}
+                </label>
+                <input
+                  type="text"
+                  value={storeUrl}
+                  onChange={(e) => setStoreUrl(e.target.value)}
+                  className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3.5 py-2 text-white text-sm focus:outline-none focus:border-purple-500 font-mono"
+                  placeholder={platform === 'woocommerce' ? 'https://example-shop.com' : 'my-store.myshopify.com'}
+                />
+              </div>
+
+              {platform === 'woocommerce' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Consumer Key
+                    </label>
+                    <input
+                      type="text"
+                      value={consumerKey}
+                      onChange={(e) => setConsumerKey(e.target.value)}
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Consumer Secret
+                    </label>
+                    <input
+                      type="password"
+                      value={consumerSecret}
+                      onChange={(e) => setConsumerSecret(e.target.value)}
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    Admin API Access Token
+                  </label>
+                  <input
+                    type="password"
+                    value={consumerKey}
+                    onChange={(e) => setConsumerKey(e.target.value)}
+                    className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500 font-mono"
+                    placeholder="shpat_..."
+                  />
+                </div>
+              )}
+
+              {/* Store Status Message */}
+              {storeStatus && (
+                <div
+                  className={`flex items-center gap-2 p-3 rounded-xl text-xs border ${
+                    storeStatus.connected
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                  }`}
+                >
+                  {storeStatus.connected ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  <span>{storeStatus.connected ? `Connected: ${storeStatus.name}` : `Error: ${storeStatus.error}`}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleTestStore}
+                disabled={isStoreTesting}
+                className="w-full py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-white transition flex items-center justify-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isStoreTesting ? 'animate-spin' : ''}`} />
+                {isStoreTesting ? 'Testing Store Connection...' : 'Test Store Connection'}
+              </button>
+            </div>
+          </div>
+
+          {/* Step 2: AutoMate Destination */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white">2. AutoMate Destination</h3>
+                <p className="text-xs text-slate-400">Settings &gt; Website stores in your AutoMate dashboard</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  AutoMate Base URL
+                </label>
+                <input
+                  type="text"
+                  value={automateBaseUrl}
+                  onChange={(e) => setAutomateBaseUrl(e.target.value)}
+                  className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3.5 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="https://api.example.com/v1/store"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  AutoMate Token (43 characters)
+                </label>
+                <input
+                  type="password"
+                  value={automateToken}
+                  onChange={(e) => setAutomateToken(e.target.value)}
+                  className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3.5 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="Zf3q..."
+                />
+              </div>
+
+              {/* AutoMate Status Message */}
+              {automateStatus && (
+                <div
+                  className={`flex items-center gap-2 p-3 rounded-xl text-xs border ${
+                    automateStatus.connected
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                  }`}
+                >
+                  {automateStatus.connected ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  <span>
+                    {automateStatus.connected
+                      ? `Verified AutoMate Shop: "${automateStatus.shop}" (${automateStatus.store})`
+                      : `Error: ${automateStatus.error}`}
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleTestAutoMate}
+                disabled={isAutomateTesting}
+                className="w-full py-2.5 rounded-xl border border-indigo-500/40 bg-indigo-600/20 hover:bg-indigo-600/30 text-xs font-semibold text-indigo-300 transition flex items-center justify-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isAutomateTesting ? 'animate-spin' : ''}`} />
+                {isAutomateTesting ? 'Verifying with AutoMate...' : 'Test AutoMate Connection'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sync Controls & Webhook Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Action 1: Batch Product Sync */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center gap-2.5 text-indigo-400 font-bold text-sm mb-2">
+                <Package className="w-4 h-4" />
+                Push Catalog to AutoMate
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Fetches products and clothing variants from your store and syncs them into AutoMate with rate-limit pacing (2 requests/sec).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncProducts}
+              disabled={isSyncingProducts}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingProducts ? 'animate-spin' : ''}`} />
+              {isSyncingProducts ? 'Streaming Products...' : 'Sync Products to AutoMate'}
+            </button>
+          </div>
+
+          {/* Action 2: Batch Order Sync */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center gap-2.5 text-emerald-400 font-bold text-sm mb-2">
+                <ShoppingCart className="w-4 h-4" />
+                Push Orders to AutoMate
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Fetches recent confirmed orders from your store, normalizes customer phones, and creates Pending orders in AutoMate.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncOrders}
+              disabled={isSyncingOrders}
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+            >
+              <Send className={`w-4 h-4 ${isSyncingOrders ? 'animate-spin' : ''}`} />
+              {isSyncingOrders ? 'Forwarding Orders...' : 'Sync Orders to AutoMate'}
+            </button>
+          </div>
+
+          {/* Action 3: Real-Time Webhook Endpoint */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center gap-2.5 text-purple-400 font-bold text-sm mb-2">
+                <ExternalLink className="w-4 h-4" />
+                Real-Time Webhook Target
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Paste this into WooCommerce (Settings &gt; Advanced &gt; Webhooks &gt; Topic: Order created) for instant live order dispatch.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs font-mono">
+              <span className="truncate text-slate-300 flex-1">{webhookUrl}</span>
+              <button
+                type="button"
+                onClick={copyWebhookUrl}
+                className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                {copiedWebhook ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Stream Terminal Console */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-3 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Live Bridge Activity Console (Zero DB / In-Memory Stream)
+              </span>
+            </div>
+            <button
+              onClick={() => setLogs([])}
+              className="text-xs text-slate-500 hover:text-slate-300 transition"
+            >
+              Clear Console
+            </button>
+          </div>
+
+          <div className="h-64 overflow-y-auto space-y-2 font-mono text-xs pr-2">
+            {logs.length === 0 ? (
+              <div className="text-slate-600 italic py-8 text-center">No stream activity yet.</div>
+            ) : (
+              logs.map((log) => (
+                <div key={log.id} className="flex items-start gap-2.5">
+                  <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
+                  <span
+                    className={
+                      log.type === 'success'
+                        ? 'text-emerald-400 font-semibold'
+                        : log.type === 'error'
+                        ? 'text-rose-400 font-semibold'
+                        : log.type === 'warning'
+                        ? 'text-amber-400'
+                        : 'text-slate-300'
+                    }
+                  >
+                    {log.message}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
